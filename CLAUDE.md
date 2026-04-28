@@ -1,4 +1,5 @@
 @AGENTS.md
+
 # Inbox Concierge — CLAUDE.md
 
 This file is the source of truth for Claude Code and Cursor when working in this repo. Read it fully before making changes.
@@ -8,6 +9,7 @@ This file is the source of truth for Claude Code and Cursor when working in this
 This project uses Next.js 16. Most LLM training data predates Next.js 16 and contains patterns that no longer work. **Before writing or modifying any Next.js-specific code (route handlers, layouts, middleware, request APIs, caching, server actions, etc.), read the relevant guide in `node_modules/next/dist/docs/`.**
 
 Specifically beware of:
+
 - `cookies()`, `headers()`, `draftMode()` — now async, must be `await`ed
 - `params` and `searchParams` in pages/layouts — now Promises, must be `await`ed
 - `revalidateTag(tag)` — requires a second argument: `revalidateTag(tag, cacheLifeProfile)`
@@ -27,24 +29,24 @@ This is a take-home assignment for Tenex. The bar is production-grade, not demo-
 
 ## Architecture (Locked — Do Not Change Without Explicit Approval)
 
-| Concern | Choice |
-|---|---|
-| Framework | Next.js 16 App Router + TypeScript strict mode |
-| Auth | Supabase Auth with Google OAuth (Gmail scopes) |
-| Database | Supabase Postgres with Row Level Security |
-| Server state | TanStack Query |
-| Client state | Zustand (UI state only — modals, expanded panels) |
-| API security | Zod validation + Supabase JWT verification on every route |
-| Inbound rate limit | Upstash Ratelimit |
-| Outbound rate limit | p-limit + exponential backoff on Claude and Gmail calls |
-| LLM | Claude API (server-side only, model: claude-sonnet-4-5) |
-| Gmail | Gmail REST API via googleapis SDK (server-side only) |
-| Error tracking | Sentry (client + server) |
-| Logging | Structured JSON logs |
-| Testing | Vitest for parser, executor, threshold logic |
-| Styling | Tailwind CSS |
-| Env validation | Zod-validated env schema, fails at startup if missing |
-| Deployment | Vercel |
+| Concern             | Choice                                                    |
+| ------------------- | --------------------------------------------------------- |
+| Framework           | Next.js 16 App Router + TypeScript strict mode            |
+| Auth                | Supabase Auth with Google OAuth (Gmail scopes)            |
+| Database            | Supabase Postgres with Row Level Security                 |
+| Server state        | TanStack Query                                            |
+| Client state        | Zustand (UI state only — modals, expanded panels)         |
+| API security        | Zod validation + Supabase JWT verification on every route |
+| Inbound rate limit  | Upstash Ratelimit                                         |
+| Outbound rate limit | p-limit + exponential backoff on Claude and Gmail calls   |
+| LLM                 | Claude API (server-side only, model: claude-sonnet-4-5)   |
+| Gmail               | Gmail REST API via googleapis SDK (server-side only)      |
+| Error tracking      | Sentry (client + server)                                  |
+| Logging             | Structured JSON logs                                      |
+| Testing             | Vitest for parser, executor, threshold logic              |
+| Styling             | Tailwind CSS                                              |
+| Env validation      | Zod-validated env schema, fails at startup if missing     |
+| Deployment          | Vercel                                                    |
 
 ## Privacy Architecture (Critical — Never Violate)
 
@@ -165,17 +167,18 @@ supabase/
 
 ## Commands
 
-- `pnpm dev` — local dev server
-- `pnpm build` — production build
-- `pnpm test` — run Vitest
-- `pnpm lint` — ESLint
-- `pnpm typecheck` — tsc --noEmit
-- `pnpm db:push` — push migrations to Supabase
-- `pnpm db:types` — regenerate TypeScript types from schema
+- `npm run dev` — local dev server
+- `npm run build` — production build
+- `npm run test` — run Vitest
+- `npm run lint` — ESLint
+- `npm run typecheck` — tsc --noEmit
+- `npm run db:push` — push migrations to Supabase
+- `npm run db:types` — regenerate TypeScript types from schema
 
 ## Pre-commit (Husky)
 
 Runs on every commit:
+
 1. ESLint --fix
 2. Prettier --write
 3. Type check
