@@ -1,0 +1,6 @@
+npx lint-staged
+npm run typecheck
+files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx')
+if [ -n "$files" ]; then
+  npx vitest related --run $files
+fi
