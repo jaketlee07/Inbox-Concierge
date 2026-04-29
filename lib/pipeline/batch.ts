@@ -26,17 +26,36 @@ export type BatchResult =
 // concurrency, and returns one BatchResult per chunk. Per-batch error isolation
 // is the whole point: a single bad batch never throws — it returns
 // `{status:'failed', ...}` so the other 9 (of 10 typical) keep going.
+//
+// Optional `onBatchComplete` runs INSIDE the pLimit wrapper so DB/Gmail work
+// the caller does in the callback counts toward the same 5-batch budget —
+// keeps Postgres from getting hammered while Claude calls are also in flight.
+// Callback errors are caught and logged so a flaky callback can't poison
+// sibling batches.
 export async function runBatches(
   threads: readonly GmailThread[],
   buckets: readonly string[],
   userOverridesSummary: string,
+  onBatchComplete?: (result: BatchResult) => Promise<void>,
 ): Promise<BatchResult[]> {
   if (threads.length === 0) return [];
   const chunks = chunk(threads, BATCH_SIZE);
   const limit = pLimit(CONCURRENCY);
   return Promise.all(
     chunks.map((threadChunk) =>
-      limit(() => runOneBatch(threadChunk, buckets, userOverridesSummary)),
+      limit(async () => {
+        const result = await runOneBatch(threadChunk, buckets, userOverridesSummary);
+        if (onBatchComplete) {
+          try {
+            await onBatchComplete(result);
+          } catch (err) {
+            logger.error('batch.callback_failed', {
+              errorCode: isAppError(err) ? err.code : 'UNKNOWN',
+            });
+          }
+        }
+        return result;
+      }),
     ),
   );
 }
