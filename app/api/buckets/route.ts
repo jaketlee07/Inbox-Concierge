@@ -1,7 +1,7 @@
 import 'server-only';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { gmailFetchLimiter, queueMutationLimiter } from '@/lib/ratelimit';
+import { appReadLimiter, queueMutationLimiter } from '@/lib/ratelimit';
 import { logger } from '@/lib/logger';
 import { createClient } from '@/lib/supabase/server';
 import { AppError, AuthError, ValidationError, isAppError, toErrorResponse } from '@/lib/errors';
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     } = await supabase.auth.getUser();
     if (!user) throw new AuthError();
 
-    const limit = await gmailFetchLimiter.limit(user.id);
+    const limit = await appReadLimiter.limit(user.id);
     if (!limit.success) {
       const retryAfter = Math.max(1, Math.ceil((limit.reset - Date.now()) / 1000));
       return NextResponse.json(

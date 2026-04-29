@@ -98,7 +98,7 @@ export function InboxView({ userId }: InboxViewProps) {
             </span>
           )}
         </div>
-        {(isError || classification.error) && (
+        {(isError || buckets.isError || classification.error) && (
           <div
             role="alert"
             className="mt-2 flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
@@ -106,10 +106,22 @@ export function InboxView({ userId }: InboxViewProps) {
             <span>
               {isError
                 ? (error?.message ?? 'Failed to fetch threads')
-                : (classification.error?.message ?? 'Classification failed')}
+                : buckets.isError
+                  ? (buckets.error?.message ?? 'Failed to load buckets')
+                  : (classification.error?.message ?? 'Classification failed')}
             </span>
-            {isError && (
-              <Button variant="secondary" size="sm" onClick={() => refetch()}>
+            {(isError || buckets.isError) && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  // Retry both queries — they often fail together (rate-limit
+                  // cascade), so retrying just one leaves the inbox in a
+                  // half-loaded state with no columns to render into.
+                  if (isError) void refetch();
+                  if (buckets.isError) void buckets.refetch();
+                }}
+              >
                 Retry
               </Button>
             )}

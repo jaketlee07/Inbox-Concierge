@@ -1,6 +1,6 @@
 import 'server-only';
 import { type NextRequest, NextResponse } from 'next/server';
-import { gmailFetchLimiter } from '@/lib/ratelimit';
+import { appReadLimiter } from '@/lib/ratelimit';
 import { logger } from '@/lib/logger';
 import { createClient } from '@/lib/supabase/server';
 import { AuthError, isAppError, toErrorResponse } from '@/lib/errors';
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       throw new AuthError();
     }
 
-    const limit = await gmailFetchLimiter.limit(user.id);
+    const limit = await appReadLimiter.limit(user.id);
     if (!limit.success) {
       const retryAfter = Math.max(1, Math.ceil((limit.reset - Date.now()) / 1000));
       logger.warn('queue.list.rate_limited', { userId: user.id, requestId });

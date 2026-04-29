@@ -68,3 +68,14 @@ export const queueMutationLimiter = new Ratelimit({
   prefix: 'queue:mutation',
   analytics: false,
 });
+
+// Lightweight Supabase-only reads: /api/queue, /api/buckets, /api/stats,
+// /api/profile. These don't spend Gmail quota, so they don't belong on the
+// 5/min gmailFetchLimiter — five of them all firing on first inbox load
+// (plus React Strict Mode dev double-renders) was tipping users into 429.
+export const appReadLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(60, '60 s'),
+  prefix: 'app:read',
+  analytics: false,
+});
