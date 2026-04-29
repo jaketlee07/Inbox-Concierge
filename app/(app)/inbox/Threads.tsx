@@ -1,56 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import type { GmailThread } from '@/types/thread';
+import { useThreads } from '@/hooks/useThreads';
 
-type ApiResponse = {
-  count: number;
-  fetched: number;
-  threads: GmailThread[];
-  failed: string[];
-};
-
-type State =
-  | { kind: 'idle' }
-  | { kind: 'loading' }
-  | { kind: 'error'; message: string }
-  | { kind: 'ready'; data: ApiResponse };
-
-export function Threads() {
-  const [state, setState] = useState<State>({ kind: 'idle' });
-
-  const fetchThreads = useCallback(async () => {
-    setState({ kind: 'loading' });
-    try {
-      const res = await fetch('/api/gmail/fetch-threads', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as {
-          error?: { message?: string };
-        };
-        const message = body.error?.message ?? `Request failed (${res.status})`;
-        setState({ kind: 'error', message });
-        return;
-      }
-      const data = (await res.json()) as ApiResponse;
-      setState({ kind: 'ready', data });
-    } catch (e) {
-      setState({
-        kind: 'error',
-        message: e instanceof Error ? e.message : 'Network error',
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    // Initial fetch on mount. The React 19 lint rule warns about setState
-    // inside effects but this "fetch on mount" pattern is the intended use.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void fetchThreads();
-  }, [fetchThreads]);
+export function Threads({ userId }: { userId: string }) {
+  const { data, isLoading, isError, error, refetch, isFetching } = useThreads(userId);
 
   return (
     <section className="mx-auto max-w-3xl px-6 py-6">
@@ -58,37 +11,36 @@ export function Threads() {
         <h2 className="text-base font-medium text-neutral-900">Threads</h2>
         <button
           type="button"
-          onClick={fetchThreads}
-          disabled={state.kind === 'loading'}
+          onClick={() => refetch()}
+          disabled={isFetching}
           className="rounded border border-neutral-300 bg-white px-3 py-1 text-sm hover:bg-neutral-50 disabled:opacity-50"
         >
-          {state.kind === 'loading' ? 'Fetching…' : 'Refresh'}
+          {isFetching ? 'Fetching…' : 'Refresh'}
         </button>
       </div>
 
-      {state.kind === 'loading' && (
-        <p className="text-sm text-neutral-500">Fetching threads from Gmail…</p>
-      )}
+      {isLoading && <p className="text-sm text-neutral-500">Fetching threads from Gmail…</p>}
 
-      {state.kind === 'error' && (
+      {isError && (
         <div
           role="alert"
           className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
         >
-          {state.message}
+          {error?.message ?? 'Something went wrong'}
         </div>
       )}
 
-      {state.kind === 'ready' && (
+      {data && (
         <>
           <p className="mb-3 text-xs text-neutral-500">
-            {state.data.fetched} fetched, {state.data.failed.length} failed (of {state.data.count})
+            {data.fetched} fetched, {data.failed.length} failed (of {data.count})
+            {isFetching && ' · refreshing…'}
           </p>
-          {state.data.threads.length === 0 ? (
+          {data.threads.length === 0 ? (
             <p className="text-sm text-neutral-500">No threads.</p>
           ) : (
             <ul className="divide-y divide-neutral-200 rounded-md border border-neutral-200 bg-white">
-              {state.data.threads.map((t) => (
+              {data.threads.map((t) => (
                 <li key={t.id} className="px-4 py-3 text-sm">
                   <div className="flex items-baseline justify-between gap-3">
                     <span

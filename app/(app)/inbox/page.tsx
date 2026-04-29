@@ -28,7 +28,7 @@ export default async function InboxPage() {
           </form>
         </div>
       </header>
-      <Threads />
+      <Threads userId={user.id} />
     </main>
   );
 }
