@@ -27,3 +27,22 @@ export const gmailMutationLimiter = new Ratelimit({
   prefix: 'gmail:mutation',
   analytics: false,
 });
+
+// Preview classification requests. Each call hits Claude with up to 20
+// threads of metadata — heavier than a Gmail call. 5/min/user is generous
+// enough for iteration while bounding accidental thrash.
+export const classifyPreviewLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, '60 s'),
+  prefix: 'classify:preview',
+  analytics: false,
+});
+
+// Production classification: heavy operation (up to 200 threads, multiple
+// batches, real DB writes + Gmail actions). 1/min/user matches the spec.
+export const classifyLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(1, '60 s'),
+  prefix: 'classify:run',
+  analytics: false,
+});
