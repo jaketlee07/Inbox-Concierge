@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useBuckets, useCreateBucket, useDeleteBucket, type BucketView } from '@/hooks/useBuckets';
 import { useClassification } from '@/hooks/useClassification';
+import { recordUserAction } from '@/lib/sentry/breadcrumbs';
 
 interface BucketManagerProps {
   userId: string;
@@ -34,6 +35,7 @@ export function BucketManager({ userId, open, onOpenChange }: BucketManagerProps
     if (!canAdd) return;
     try {
       await createBucket.mutateAsync({ name: trimmed });
+      recordUserAction('bucket_created', { name: trimmed });
       setName('');
       setReclassifyOpen(true);
     } catch {
@@ -53,6 +55,11 @@ export function BucketManager({ userId, open, onOpenChange }: BucketManagerProps
       await deleteBucket.mutateAsync({
         id: pendingDelete.id,
         reassignToBucketName: reassignTarget,
+      });
+      recordUserAction('bucket_deleted', {
+        name: pendingDelete.name,
+        reassignedTo: reassignTarget,
+        threadCount: pendingDelete.threadCount,
       });
       setPendingDelete(null);
       setReassignTarget('');

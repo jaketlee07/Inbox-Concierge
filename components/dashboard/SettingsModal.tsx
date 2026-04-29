@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { BucketManager } from '@/components/buckets/BucketManager';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { useClassification } from '@/hooks/useClassification';
+import { recordUserAction } from '@/lib/sentry/breadcrumbs';
 
 interface SettingsModalProps {
   userId: string;
@@ -67,6 +68,11 @@ export function SettingsModal({ userId, open, onOpenChange }: SettingsModalProps
       autoExecuteThreshold: autoExecute,
       reviewThreshold: queue,
       autopilotPaused: paused,
+    });
+    recordUserAction('settings_saved', {
+      autoExecute,
+      queue,
+      paused,
     });
     queryClient.invalidateQueries({ queryKey: ['stats', userId] });
     onOpenChange(false);

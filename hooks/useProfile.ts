@@ -8,6 +8,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { toast } from '@/components/ui/Toast';
+import { apiFetch } from '@/lib/api/fetch';
 
 export interface ProfileResponse {
   autoExecuteThreshold: number;
@@ -26,29 +27,15 @@ interface OptimisticContext {
 }
 
 async function fetchProfile(): Promise<ProfileResponse> {
-  const res = await fetch('/api/profile', { method: 'GET' });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as {
-      error?: { code?: string; message?: string };
-    };
-    throw new Error(body.error?.message ?? `Request failed (${res.status})`);
-  }
-  return (await res.json()) as ProfileResponse;
+  return apiFetch<ProfileResponse>('/api/profile');
 }
 
 async function patchProfile(input: ProfilePatch): Promise<ProfileResponse> {
-  const res = await fetch('/api/profile', {
+  return apiFetch<ProfileResponse>('/api/profile', {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(input),
   });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as {
-      error?: { code?: string; message?: string };
-    };
-    throw new Error(body.error?.message ?? `Request failed (${res.status})`);
-  }
-  return (await res.json()) as ProfileResponse;
 }
 
 export function useProfile(userId: string): UseQueryResult<ProfileResponse, Error> {

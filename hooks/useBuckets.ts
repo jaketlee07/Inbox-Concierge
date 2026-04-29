@@ -8,6 +8,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { toast } from '@/components/ui/Toast';
+import { apiFetch } from '@/lib/api/fetch';
 
 export type DefaultAction = 'archive' | 'label' | null;
 
@@ -36,44 +37,24 @@ interface DeleteVars {
 }
 
 async function fetchBuckets(): Promise<BucketsResponse> {
-  const res = await fetch('/api/buckets', { method: 'GET' });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as {
-      error?: { code?: string; message?: string };
-    };
-    throw new Error(body.error?.message ?? `Request failed (${res.status})`);
-  }
-  return (await res.json()) as BucketsResponse;
+  return apiFetch<BucketsResponse>('/api/buckets');
 }
 
 async function createBucket(input: CreateVars): Promise<BucketView> {
-  const res = await fetch('/api/buckets', {
+  const data = await apiFetch<{ bucket: BucketView }>('/api/buckets', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(input),
   });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as {
-      error?: { code?: string; message?: string };
-    };
-    throw new Error(body.error?.message ?? `Request failed (${res.status})`);
-  }
-  const data = (await res.json()) as { bucket: BucketView };
   return data.bucket;
 }
 
 async function deleteBucket(input: DeleteVars): Promise<void> {
-  const res = await fetch(`/api/buckets/${encodeURIComponent(input.id)}`, {
+  await apiFetch<unknown>(`/api/buckets/${encodeURIComponent(input.id)}`, {
     method: 'DELETE',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ reassignToBucketName: input.reassignToBucketName }),
   });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as {
-      error?: { code?: string; message?: string };
-    };
-    throw new Error(body.error?.message ?? `Request failed (${res.status})`);
-  }
 }
 
 export function useBuckets(userId: string): UseQueryResult<BucketsResponse, Error> {

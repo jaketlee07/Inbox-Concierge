@@ -15,6 +15,7 @@ import { SYSTEM_BUCKETS, isSystemBucketName, type SystemBucket } from '@/lib/buc
 import { Button } from '@/components/ui/Button';
 import { ConfidenceMeter } from '@/components/ui/ConfidenceMeter';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { recordUserAction } from '@/lib/sentry/breadcrumbs';
 import { cn } from '@/lib/utils';
 
 interface ReviewCardProps {
@@ -103,7 +104,10 @@ export function ReviewCard({ userId, item }: ReviewCardProps) {
           size="sm"
           loading={approve.isPending}
           disabled={isPending}
-          onClick={() => approve.mutate({ queueId: item.queueId })}
+          onClick={() => {
+            recordUserAction('queue_approve', { confidence: item.confidence });
+            approve.mutate({ queueId: item.queueId });
+          }}
         >
           Approve
         </Button>
@@ -112,14 +116,20 @@ export function ReviewCard({ userId, item }: ReviewCardProps) {
           loading={override.isPending}
           currentBucket={item.bucket}
           buckets={buckets.data?.buckets ?? []}
-          onPick={(bucketName) => override.mutate({ queueId: item.queueId, bucketName })}
+          onPick={(bucketName) => {
+            recordUserAction('queue_override', { from: item.bucket, to: bucketName });
+            override.mutate({ queueId: item.queueId, bucketName });
+          }}
         />
         <Button
           variant="ghost"
           size="sm"
           loading={dismiss.isPending}
           disabled={isPending}
-          onClick={() => dismiss.mutate({ queueId: item.queueId })}
+          onClick={() => {
+            recordUserAction('queue_dismiss', { bucket: item.bucket });
+            dismiss.mutate({ queueId: item.queueId });
+          }}
         >
           Dismiss
         </Button>

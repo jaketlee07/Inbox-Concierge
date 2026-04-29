@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { Inbox } from 'lucide-react';
 import type { GmailThread } from '@/types/thread';
 import { useThreads } from '@/hooks/useThreads';
 import { useClassification } from '@/hooks/useClassification';
@@ -8,6 +9,7 @@ import { useBuckets } from '@/hooks/useBuckets';
 import { Button } from '@/components/ui/Button';
 import { BucketColumn } from '@/components/inbox/BucketColumn';
 import { EmailCard } from '@/components/inbox/EmailCard';
+import { recordUserAction } from '@/lib/sentry/breadcrumbs';
 
 interface InboxViewProps {
   userId: string;
@@ -64,7 +66,10 @@ export function InboxView({ userId }: InboxViewProps) {
             <Button
               variant="primary"
               size="sm"
-              onClick={() => void classification.start()}
+              onClick={() => {
+                recordUserAction('classify_started', { force: false });
+                void classification.start();
+              }}
               disabled={!canClassify}
               loading={classification.isRunning}
             >
@@ -111,27 +116,43 @@ export function InboxView({ userId }: InboxViewProps) {
           </div>
         )}
       </div>
-      <div
-        className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-auto p-4 md:overflow-x-auto md:overflow-y-hidden"
-        // dynamic column count — Tailwind JIT can't generate runtime grid-template strings
-        style={{
-          gridTemplateColumns:
-            sortedBuckets.length > 0
-              ? `repeat(${sortedBuckets.length}, minmax(280px, 1fr))`
-              : undefined,
-        }}
-      >
-        {sortedBuckets.map((b) => (
-          <BucketColumn
-            key={b.id}
-            bucket={b}
-            threads={grouped.map.get(b.name) ?? []}
-            classifications={data?.classifications}
-            isLoading={isLoading || buckets.isLoading}
-            renderItem={(thread, c) => <EmailCard threadId={thread.id} classification={c} />}
-          />
-        ))}
-      </div>
+      {!isLoading && data && data.threads.length === 0 ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center text-neutral-500">
+          <Inbox className="mb-3 h-10 w-10 text-neutral-300" aria-hidden="true" />
+          <p className="text-sm">Your inbox appears empty.</p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-3"
+            onClick={() => refetch()}
+            loading={isFetching}
+          >
+            Refresh
+          </Button>
+        </div>
+      ) : (
+        <div
+          className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-auto p-4 md:overflow-x-auto md:overflow-y-hidden"
+          // dynamic column count — Tailwind JIT can't generate runtime grid-template strings
+          style={{
+            gridTemplateColumns:
+              sortedBuckets.length > 0
+                ? `repeat(${sortedBuckets.length}, minmax(280px, 1fr))`
+                : undefined,
+          }}
+        >
+          {sortedBuckets.map((b) => (
+            <BucketColumn
+              key={b.id}
+              bucket={b}
+              threads={grouped.map.get(b.name) ?? []}
+              classifications={data?.classifications}
+              isLoading={isLoading || buckets.isLoading}
+              renderItem={(thread, c) => <EmailCard threadId={thread.id} classification={c} />}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

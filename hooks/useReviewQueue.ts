@@ -9,6 +9,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { toast } from '@/components/ui/Toast';
+import { apiFetch } from '@/lib/api/fetch';
 import type { BucketsResponse } from '@/hooks/useBuckets';
 import type { FetchThreadsResponse, ThreadClassificationView } from '@/hooks/useThreads';
 
@@ -44,28 +45,15 @@ interface OptimisticContext {
 }
 
 async function fetchQueue(): Promise<QueueResponse> {
-  const res = await fetch('/api/queue', { method: 'GET' });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as {
-      error?: { code?: string; message?: string };
-    };
-    throw new Error(body.error?.message ?? `Request failed (${res.status})`);
-  }
-  return (await res.json()) as QueueResponse;
+  return apiFetch<QueueResponse>('/api/queue');
 }
 
 async function postJson(url: string, body: unknown): Promise<void> {
-  const res = await fetch(url, {
+  await apiFetch<unknown>(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const data = (await res.json().catch(() => ({}))) as {
-      error?: { code?: string; message?: string };
-    };
-    throw new Error(data.error?.message ?? `Request failed (${res.status})`);
-  }
 }
 
 export function useReviewQueue(userId: string): UseQueryResult<QueueResponse, Error> {

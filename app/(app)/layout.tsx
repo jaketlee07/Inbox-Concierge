@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { AutopilotBar } from '@/components/dashboard/AutopilotBar';
 import { ReviewQueue } from '@/components/queue/ReviewQueue';
-import { signOut } from './inbox/actions';
+import { MobileReviewQueueButton } from '@/components/queue/MobileReviewQueueButton';
+import { SignOutForm } from '@/components/inbox/SignOutForm';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient();
@@ -21,14 +22,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </div>
         <div className="flex items-center gap-3 text-sm">
           <span className="text-neutral-600">{user.email}</span>
-          <form action={signOut}>
-            <button
-              type="submit"
-              className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 transition hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2 focus-visible:outline-none"
-            >
-              Sign out
-            </button>
-          </form>
+          <SignOutForm />
         </div>
       </header>
       <div className="grid min-h-0 grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px]">
@@ -37,6 +31,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <ReviewQueue userId={user.id} />
         </aside>
       </div>
+      <MobileReviewQueueButton userId={user.id} />
     </div>
   );
 }
