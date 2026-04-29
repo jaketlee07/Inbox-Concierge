@@ -100,10 +100,12 @@ interface StatPillProps {
   tone: 'emerald' | 'amber' | 'neutral';
 }
 
+// Subtle, non-interactive label styling — no border or filled background, so
+// the pills don't read as buttons. Tooltip still surfaces the full label.
 const TONE_CLASS: Record<StatPillProps['tone'], string> = {
-  emerald: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-  amber: 'border-amber-200 bg-amber-50 text-amber-800',
-  neutral: 'border-neutral-200 bg-neutral-50 text-neutral-700',
+  emerald: 'text-emerald-700',
+  amber: 'text-amber-700',
+  neutral: 'text-neutral-600',
 };
 
 function StatPill({ icon, label, value, loading, tone }: StatPillProps) {
@@ -111,7 +113,7 @@ function StatPill({ icon, label, value, loading, tone }: StatPillProps) {
     <Tooltip content={label}>
       <span
         className={cn(
-          'inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs font-medium tabular-nums',
+          'inline-flex h-7 items-center gap-1 px-1 text-xs font-medium tabular-nums',
           TONE_CLASS[tone],
         )}
       >

@@ -67,37 +67,42 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!parsed.success) throw new ValidationError('Invalid request body');
     const { queueId, bucketName } = parsed.data;
 
-    const { data: rowRaw, error: readErr } = await supabase
-      .from('review_queue')
-      .select(
-        `id, status, classification_id, classifications!inner(id, bucket_id, threads!inner(id, gmail_thread_id))`,
-      )
-      .eq('id', queueId)
-      .eq('user_id', user.id)
-      .single();
-    if (readErr || !rowRaw) {
+    // Reads are independent — both keyed only on body params. Parallelize so
+    // we pay one round-trip instead of two before the validation gate.
+    const [queueRead, bucketRead] = await Promise.all([
+      supabase
+        .from('review_queue')
+        .select(
+          `id, status, classification_id, classifications!inner(id, bucket_id, threads!inner(id, gmail_thread_id))`,
+        )
+        .eq('id', queueId)
+        .eq('user_id', user.id)
+        .single(),
+      supabase
+        .from('buckets')
+        .select('id, name, default_action')
+        .eq('user_id', user.id)
+        .eq('name', bucketName)
+        .single(),
+    ]);
+
+    if (queueRead.error || !queueRead.data) {
       throw new NotFoundError('Review item not found');
     }
-    const row = rowRaw as unknown as QueueRow;
+    const row = queueRead.data as unknown as QueueRow;
     if (row.status !== 'pending') {
       throw new ValidationError(`Review item already ${row.status}`);
     }
+
+    if (bucketRead.error || !bucketRead.data) {
+      throw new NotFoundError(`Bucket "${bucketName}" not found`);
+    }
+    const newBucket = bucketRead.data as BucketRow;
 
     const classificationId = row.classifications.id;
     const originalBucketId = row.classifications.bucket_id;
     const dbThreadId = row.classifications.threads.id;
     const gmailThreadId = row.classifications.threads.gmail_thread_id;
-
-    const { data: bucketRaw, error: bucketErr } = await supabase
-      .from('buckets')
-      .select('id, name, default_action')
-      .eq('user_id', user.id)
-      .eq('name', bucketName)
-      .single();
-    if (bucketErr || !bucketRaw) {
-      throw new NotFoundError(`Bucket "${bucketName}" not found`);
-    }
-    const newBucket = bucketRaw as BucketRow;
     const newBucketId = newBucket.id;
     const action: DbAction = newBucket.default_action ?? 'none';
 
@@ -110,26 +115,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       action,
     });
 
-    const { error: ovErr } = await supabase.from('overrides').insert({
-      user_id: user.id,
-      classification_id: classificationId,
-      original_bucket_id: originalBucketId,
-      new_bucket_id: newBucketId,
-    });
-    if (ovErr) {
-      throw new AppError('DB_INSERT_FAILED', 'Failed to log override', 500, ovErr);
+    // Audit log + bucket update are independent — parallelize. Both must
+    // succeed before the Gmail action so a failed Gmail call leaves a
+    // consistent record of intent.
+    const [ovRes, classBucketRes] = await Promise.all([
+      supabase.from('overrides').insert({
+        user_id: user.id,
+        classification_id: classificationId,
+        original_bucket_id: originalBucketId,
+        new_bucket_id: newBucketId,
+      }),
+      supabase
+        .from('classifications')
+        .update({ bucket_id: newBucketId })
+        .eq('id', classificationId),
+    ]);
+    if (ovRes.error) {
+      throw new AppError('DB_INSERT_FAILED', 'Failed to log override', 500, ovRes.error);
     }
-
-    const { error: classBucketErr } = await supabase
-      .from('classifications')
-      .update({ bucket_id: newBucketId })
-      .eq('id', classificationId);
-    if (classBucketErr) {
+    if (classBucketRes.error) {
       throw new AppError(
         'DB_UPDATE_FAILED',
         'Failed to update classification bucket',
         500,
-        classBucketErr,
+        classBucketRes.error,
       );
     }
 
@@ -141,35 +150,41 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const nowIso = new Date().toISOString();
-    if (action !== 'none') {
-      const { error: classExecErr } = await supabase
-        .from('classifications')
-        .update({ executed_action: action, executed_at: nowIso })
-        .eq('id', classificationId);
-      if (classExecErr) {
-        throw new AppError(
-          'DB_UPDATE_FAILED',
-          'Failed to mark classification executed',
-          500,
-          classExecErr,
-        );
-      }
+    // Trailing 3 writes are independent — parallelize.
+    const [classExecRes, threadRes, queueRes] = await Promise.all([
+      action !== 'none'
+        ? supabase
+            .from('classifications')
+            .update({ executed_action: action, executed_at: nowIso })
+            .eq('id', classificationId)
+        : Promise.resolve({ error: null }),
+      supabase
+        .from('threads')
+        .update({ classification_status: action !== 'none' ? 'executed' : 'classified' })
+        .eq('id', dbThreadId),
+      supabase
+        .from('review_queue')
+        .update({ status: 'overridden', resolved_at: nowIso })
+        .eq('id', queueId),
+    ]);
+    if (classExecRes.error) {
+      throw new AppError(
+        'DB_UPDATE_FAILED',
+        'Failed to mark classification executed',
+        500,
+        classExecRes.error,
+      );
     }
-
-    const { error: threadErr } = await supabase
-      .from('threads')
-      .update({ classification_status: action !== 'none' ? 'executed' : 'classified' })
-      .eq('id', dbThreadId);
-    if (threadErr) {
-      throw new AppError('DB_UPDATE_FAILED', 'Failed to update thread status', 500, threadErr);
+    if (threadRes.error) {
+      throw new AppError(
+        'DB_UPDATE_FAILED',
+        'Failed to update thread status',
+        500,
+        threadRes.error,
+      );
     }
-
-    const { error: queueErr } = await supabase
-      .from('review_queue')
-      .update({ status: 'overridden', resolved_at: nowIso })
-      .eq('id', queueId);
-    if (queueErr) {
-      throw new AppError('DB_UPDATE_FAILED', 'Failed to update review queue', 500, queueErr);
+    if (queueRes.error) {
+      throw new AppError('DB_UPDATE_FAILED', 'Failed to update review queue', 500, queueRes.error);
     }
 
     logger.info('queue.override.complete', {

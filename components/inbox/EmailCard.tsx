@@ -1,30 +1,22 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useLiveThreadContent } from '@/hooks/useLiveThreadContent';
+import type { GmailThread } from '@/types/thread';
 import type { ThreadClassificationView } from '@/hooks/useThreads';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { ConfidenceMeter } from '@/components/ui/ConfidenceMeter';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cn } from '@/lib/utils';
 
 interface EmailCardProps {
-  threadId: string;
+  thread: GmailThread;
   classification?: ThreadClassificationView;
 }
 
 type ActionVariant = 'success' | 'warning' | 'default';
 
-export function EmailCard({ threadId, classification }: EmailCardProps) {
-  const { data: thread, isLoading, isError } = useLiveThreadContent(threadId);
-  const gmailUrl = `https://mail.google.com/mail/u/0/#inbox/${encodeURIComponent(threadId)}`;
-
-  if (isLoading) return <CardSkeleton />;
-  if (isError || !thread) {
-    return <DegradedCard gmailUrl={gmailUrl} classification={classification} />;
-  }
-
+export function EmailCard({ thread, classification }: EmailCardProps) {
+  const gmailUrl = `https://mail.google.com/mail/u/0/#inbox/${encodeURIComponent(thread.id)}`;
   const { name: senderName, email } = parseSender(thread.latestSender);
   const action = classification ? actionFor(classification) : null;
 
@@ -80,49 +72,6 @@ export function EmailCard({ threadId, classification }: EmailCardProps) {
         )}
       </a>
     </Tooltip>
-  );
-}
-
-function CardSkeleton() {
-  return (
-    <div className="block h-[112px] px-3 py-1.5" aria-busy="true">
-      <Skeleton className="h-3 w-24" />
-      <Skeleton className="mt-1 h-4 w-full" />
-      <Skeleton className="mt-1 h-3 w-3/4" />
-      <Skeleton className="mt-1 h-3 w-1/3" />
-    </div>
-  );
-}
-
-function DegradedCard({
-  gmailUrl,
-  classification,
-}: {
-  gmailUrl: string;
-  classification?: ThreadClassificationView;
-}) {
-  const action = classification ? actionFor(classification) : null;
-  return (
-    <a
-      href={gmailUrl}
-      target="_blank"
-      rel="noreferrer"
-      className="block h-[112px] px-3 py-1.5 transition hover:bg-neutral-50 focus-visible:bg-neutral-50 focus-visible:outline-none"
-    >
-      <div className="text-xs text-neutral-500 italic">Couldn&apos;t load preview.</div>
-      <div className="mt-0.5 text-xs text-neutral-400">Open in Gmail →</div>
-      {classification && (
-        <div className="mt-2 flex items-center gap-2">
-          {action && <Badge variant={action.variant}>{action.label}</Badge>}
-          <ConfidenceMeter
-            value={classification.confidence}
-            size="sm"
-            showLabel={false}
-            className="w-12"
-          />
-        </div>
-      )}
-    </a>
   );
 }
 

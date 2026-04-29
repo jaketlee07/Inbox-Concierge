@@ -101,30 +101,43 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const nowIso = new Date().toISOString();
-    if (action !== 'none') {
-      const { error: classErr } = await supabase
-        .from('classifications')
-        .update({ executed_action: action, executed_at: nowIso })
-        .eq('id', classificationId);
-      if (classErr) {
-        throw new AppError('DB_UPDATE_FAILED', 'Failed to update classification', 500, classErr);
-      }
+    // The 3 trailing writes are independent — parallelize so a slow Supabase
+    // round-trip doesn't gate the next, dropping mutation latency from
+    // ~1.5–2.4 s of stacked round-trips to a single round-trip's worth.
+    const [classRes, threadRes, queueRes] = await Promise.all([
+      action !== 'none'
+        ? supabase
+            .from('classifications')
+            .update({ executed_action: action, executed_at: nowIso })
+            .eq('id', classificationId)
+        : Promise.resolve({ error: null }),
+      supabase
+        .from('threads')
+        .update({ classification_status: action !== 'none' ? 'executed' : 'classified' })
+        .eq('id', dbThreadId),
+      supabase
+        .from('review_queue')
+        .update({ status: 'approved', resolved_at: nowIso })
+        .eq('id', queueId),
+    ]);
+    if (classRes.error) {
+      throw new AppError(
+        'DB_UPDATE_FAILED',
+        'Failed to update classification',
+        500,
+        classRes.error,
+      );
     }
-
-    const { error: threadErr } = await supabase
-      .from('threads')
-      .update({ classification_status: action !== 'none' ? 'executed' : 'classified' })
-      .eq('id', dbThreadId);
-    if (threadErr) {
-      throw new AppError('DB_UPDATE_FAILED', 'Failed to update thread status', 500, threadErr);
+    if (threadRes.error) {
+      throw new AppError(
+        'DB_UPDATE_FAILED',
+        'Failed to update thread status',
+        500,
+        threadRes.error,
+      );
     }
-
-    const { error: queueErr } = await supabase
-      .from('review_queue')
-      .update({ status: 'approved', resolved_at: nowIso })
-      .eq('id', queueId);
-    if (queueErr) {
-      throw new AppError('DB_UPDATE_FAILED', 'Failed to update review queue', 500, queueErr);
+    if (queueRes.error) {
+      throw new AppError('DB_UPDATE_FAILED', 'Failed to update review queue', 500, queueRes.error);
     }
 
     logger.info('queue.approve.complete', {
