@@ -14,6 +14,8 @@ const LOG_ALLOWLIST = new Set([
   'requestId',
   'durationMs',
   'statusCode',
+  'attempt',
+  'errorCode',
 ]);
 
 type LogLevel = 'info' | 'warn' | 'error';

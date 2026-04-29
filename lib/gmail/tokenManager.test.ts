@@ -11,8 +11,8 @@ vi.mock('@/lib/env', () => ({
 }));
 
 vi.mock('@/lib/crypto', () => ({
-  encrypt: vi.fn((s: string) => Buffer.from(`enc:${s}`, 'utf8')),
-  decrypt: vi.fn((b: Buffer) => b.toString('utf8').replace(/^enc:/, '')),
+  encrypt: vi.fn((s: string) => `enc:${s}`),
+  decrypt: vi.fn((s: string) => s.replace(/^enc:/, '')),
 }));
 
 type SelectResult = { data: unknown; error: unknown };
@@ -54,7 +54,8 @@ vi.mock('@/lib/supabase/admin', () => ({
 const NOW = new Date('2026-04-28T12:00:00.000Z').getTime();
 
 function bytea(plaintext: string): string {
-  return '\\x' + Buffer.from(`enc:${plaintext}`, 'utf8').toString('hex');
+  // Mirrors the new crypto.ts transport format: \x-prefixed hex.
+  return `enc:${plaintext}`;
 }
 
 function makeRow(overrides: {
@@ -138,8 +139,8 @@ describe('getAccessToken', () => {
 
     expect(mockState.updateUserIdEq).toBe('u1');
     expect(mockState.updatePayload).not.toBeNull();
-    const payload = mockState.updatePayload as { access_token: Buffer; expires_at: string };
-    expect(payload.access_token.toString('utf8')).toBe('enc:new-at');
+    const payload = mockState.updatePayload as { access_token: string; expires_at: string };
+    expect(payload.access_token).toBe('enc:new-at');
     expect(Date.parse(payload.expires_at)).toBe(NOW + 3600 * 1000);
   });
 

@@ -31,10 +31,10 @@ export async function getAccessToken(userId: string): Promise<string> {
   const now = Date.now();
 
   if (data.access_token && expiresAtMs - now > EXPIRY_BUFFER_MS) {
-    return decrypt(byteaToBuffer(data.access_token));
+    return decrypt(data.access_token);
   }
 
-  const refreshToken = decrypt(byteaToBuffer(data.refresh_token));
+  const refreshToken = decrypt(data.refresh_token);
   const refreshed = await refreshAccessToken(refreshToken, userId);
 
   const newExpiresAt = new Date(now + refreshed.expires_in * 1000).toISOString();
@@ -95,9 +95,4 @@ async function refreshAccessToken(
     );
   }
   return { access_token: json.access_token, expires_in: json.expires_in };
-}
-
-function byteaToBuffer(value: string): Buffer {
-  // Postgres bytea via PostgREST → "\xDEADBEEF" hex string.
-  return Buffer.from(value.startsWith('\\x') ? value.slice(2) : value, 'hex');
 }
