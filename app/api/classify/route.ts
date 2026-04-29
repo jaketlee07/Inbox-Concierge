@@ -139,11 +139,16 @@ export async function POST(request: NextRequest): Promise<Response> {
     dbThreadIdByGmail.set(t.gmail_thread_id, t.id);
   }
 
-  // 0-pending fast path: open a stream, emit a single pipeline_complete, close.
+  // 0-pending fast path: open a stream, emit pipeline_started + a single
+  // pipeline_complete, close. Same event vocabulary as the normal path so
+  // the client doesn't need branching.
   if (pendingThreads.length === 0) {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         const encoder = new TextEncoder();
+        controller.enqueue(
+          encoder.encode(sseFrame('pipeline_started', { total: 0, hydrationFailed: 0 })),
+        );
         controller.enqueue(
           encoder.encode(
             sseFrame('pipeline_complete', { autoExecuted: 0, queued: 0, bucketed: 0, failed: 0 }),
@@ -207,6 +212,13 @@ export async function POST(request: NextRequest): Promise<Response> {
         }
       };
 
+      // Frame zero: announce total upfront so the client can render a
+      // determinate progress bar from the first batch onward.
+      send('pipeline_started', {
+        total: hydrated.length,
+        hydrationFailed: hydrationFailedCount,
+      });
+
       try {
         await runBatches(hydrated, bucketNames, '', async (result) => {
           if (result.status === 'failed') {
@@ -234,7 +246,19 @@ export async function POST(request: NextRequest): Promise<Response> {
           // source of truth for `threads.classification_status` (executed |
           // queued | classified) — calling `markBatchClassified` here would
           // overwrite that, so we don't.
-          const executionResults: { threadId: string; status: ExecutionResult['status'] }[] = [];
+          //
+          // Each entry carries enough for the client to render the inbox
+          // (bucket badge + executor status) without a follow-up DB query.
+          // Reasoning text is allowed in this response (the user owns the
+          // session); it is never persisted to Postgres.
+          const executionResults: {
+            threadId: string;
+            bucket: string;
+            confidence: number;
+            recommendedAction: 'archive' | 'label' | 'keep_inbox' | 'none';
+            reasoning: string;
+            status: ExecutionResult['status'];
+          }[] = [];
           for (const c of result.classifications) {
             const dbThreadId = dbThreadIdByGmail.get(c.threadId);
             const bucketId = bucketIdByName.get(c.bucket);
@@ -253,7 +277,14 @@ export async function POST(request: NextRequest): Promise<Response> {
                 bucketId,
                 ...deps,
               });
-              executionResults.push({ threadId: c.threadId, status: er.status });
+              executionResults.push({
+                threadId: c.threadId,
+                bucket: c.bucket,
+                confidence: c.confidence,
+                recommendedAction: c.recommendedAction,
+                reasoning: c.reasoning,
+                status: er.status,
+              });
               if (er.status === 'auto_executed') autoExecuted += 1;
               else if (er.status === 'queued') queued += 1;
               else bucketed += 1;
