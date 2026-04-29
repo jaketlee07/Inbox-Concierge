@@ -4,6 +4,8 @@ import { parseEnv } from './env.schema';
 const validEnv = {
   NODE_ENV: 'test',
   SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+  GOOGLE_CLIENT_ID: 'google-client-id',
+  GOOGLE_CLIENT_SECRET: 'google-client-secret',
   ANTHROPIC_API_KEY: 'sk-ant-test-key',
   UPSTASH_REDIS_REST_URL: 'https://example.upstash.io',
   UPSTASH_REDIS_REST_TOKEN: 'upstash-token',
