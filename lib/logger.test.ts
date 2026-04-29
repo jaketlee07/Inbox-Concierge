@@ -46,6 +46,20 @@ describe('logger', () => {
     expect(out.event).toBe('classify.completed');
   });
 
+  it('emits retry control-plane fields', () => {
+    logger.warn('gmail.retry', {
+      userId: 'u_1',
+      attempt: 2,
+      statusCode: 429,
+      errorCode: 'EXTERNAL_API_ERROR',
+    });
+
+    const out = lastJson(warnSpy);
+    expect(out.attempt).toBe(2);
+    expect(out.statusCode).toBe(429);
+    expect(out.errorCode).toBe('EXTERNAL_API_ERROR');
+  });
+
   it('strips sensitive/disallowed fields', () => {
     logger.info('email.classified', {
       threadId: 't_123',
