@@ -79,7 +79,7 @@ export interface ClaudeClassifyBatchResult {
 
 export async function classifyBatch(
   threads: readonly GmailThread[],
-  buckets: readonly string[],
+  buckets: readonly { name: string; description: string }[],
   userOverridesSummary: string,
 ): Promise<ClaudeClassifyBatchResult> {
   const userPayload = buildClassifyUserPayload(threads, buckets, userOverridesSummary);

@@ -1,12 +1,32 @@
 import 'server-only';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { GmailClient } from '@/lib/gmail/client';
 import { gmailFetchLimiter } from '@/lib/ratelimit';
 import { logger } from '@/lib/logger';
 import { createClient } from '@/lib/supabase/server';
 import { AppError, AuthError, ValidationError, isAppError, toErrorResponse } from '@/lib/errors';
 import type { GmailThread } from '@/types/thread';
+
+type DbStatus = 'pending' | 'classified' | 'executed' | 'queued' | 'error';
+type DbAction = 'archive' | 'label' | 'none';
+type ViewStatus = 'auto_executed' | 'queued' | 'bucketed';
+
+interface ClassificationView {
+  bucket: string;
+  confidence: number;
+  recommendedAction: DbAction;
+  reasoning: string;
+  status: ViewStatus;
+}
+
+interface ClassificationRow {
+  confidence: number | string;
+  recommended_action: DbAction;
+  threads: { gmail_thread_id: string; classification_status: DbStatus };
+  buckets: { name: string };
+}
 
 const BodySchema = z.object({
   maxResults: z.number().int().min(1).max(200).optional(),
@@ -118,6 +138,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Rehydrate persisted classifications so reload preserves bucket assignments.
+    // Reasoning is intentionally never persisted (privacy invariant) — return empty.
+    const classifications = await readClassifications(supabase, user.id, threads);
+
     logger.info('gmail.fetch_threads.complete', {
       userId: user.id,
       requestId,
@@ -125,7 +149,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     return NextResponse.json(
-      { count: ids.length, fetched: threads.length, threads, failed },
+      { count: ids.length, fetched: threads.length, threads, failed, classifications },
       { headers: { 'x-request-id': requestId } },
     );
   } catch (err) {
@@ -144,4 +168,48 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: statusCode, headers: { 'x-request-id': requestId } },
     );
   }
+}
+
+async function readClassifications(
+  supabase: SupabaseClient,
+  userId: string,
+  threads: GmailThread[],
+): Promise<Record<string, ClassificationView>> {
+  const out: Record<string, ClassificationView> = {};
+  if (threads.length === 0) return out;
+  const fetchedIds = new Set(threads.map((t) => t.id));
+
+  const { data, error } = await supabase
+    .from('classifications')
+    .select(
+      `confidence, recommended_action, threads!inner(gmail_thread_id, classification_status), buckets!inner(name)`,
+    )
+    .eq('user_id', userId);
+
+  if (error) {
+    logger.warn('gmail.fetch_threads.classifications_read_failed', {
+      userId,
+      errorCode: error.code,
+    });
+    return out;
+  }
+
+  for (const row of (data ?? []) as unknown as ClassificationRow[]) {
+    const gid = row.threads.gmail_thread_id;
+    if (!fetchedIds.has(gid)) continue;
+    out[gid] = {
+      bucket: row.buckets.name,
+      confidence: Number(row.confidence),
+      recommendedAction: row.recommended_action,
+      reasoning: '',
+      status: deriveStatus(row.threads.classification_status),
+    };
+  }
+  return out;
+}
+
+function deriveStatus(s: DbStatus): ViewStatus {
+  if (s === 'executed') return 'auto_executed';
+  if (s === 'queued') return 'queued';
+  return 'bucketed';
 }

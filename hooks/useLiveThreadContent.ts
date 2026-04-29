@@ -1,17 +1,11 @@
 'use client';
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api/fetch';
 import type { GmailThread } from '@/types/thread';
 
 async function fetchThread(threadId: string): Promise<GmailThread> {
-  const res = await fetch(`/api/gmail/thread/${encodeURIComponent(threadId)}`);
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as {
-      error?: { code?: string; message?: string };
-    };
-    throw new Error(body.error?.message ?? `Request failed (${res.status})`);
-  }
-  return (await res.json()) as GmailThread;
+  return apiFetch<GmailThread>(`/api/gmail/thread/${encodeURIComponent(threadId)}`);
 }
 
 export function useLiveThreadContent(

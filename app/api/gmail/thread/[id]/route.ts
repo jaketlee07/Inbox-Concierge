@@ -1,7 +1,7 @@
 import 'server-only';
 import { type NextRequest, NextResponse } from 'next/server';
 import { GmailClient } from '@/lib/gmail/client';
-import { gmailMutationLimiter } from '@/lib/ratelimit';
+import { gmailThreadReadLimiter } from '@/lib/ratelimit';
 import { logger } from '@/lib/logger';
 import { createClient } from '@/lib/supabase/server';
 import { AuthError, ValidationError, isAppError, toErrorResponse } from '@/lib/errors';
@@ -27,7 +27,7 @@ export async function GET(
       throw new AuthError();
     }
 
-    const limit = await gmailMutationLimiter.limit(user.id);
+    const limit = await gmailThreadReadLimiter.limit(user.id);
     if (!limit.success) {
       const retryAfter = Math.max(1, Math.ceil((limit.reset - Date.now()) / 1000));
       logger.warn('gmail.thread.rate_limited', { userId: user.id, requestId });

@@ -8,7 +8,7 @@ vi.mock('@/lib/supabase/server', () => ({
 
 const limiterLimit = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 vi.mock('@/lib/ratelimit', () => ({
-  gmailMutationLimiter: { limit: (...args: unknown[]) => limiterLimit(...args) },
+  gmailThreadReadLimiter: { limit: (...args: unknown[]) => limiterLimit(...args) },
 }));
 
 const getThreadMetadata = vi.fn<(...args: unknown[]) => Promise<unknown>>();

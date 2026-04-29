@@ -28,6 +28,18 @@ export const gmailMutationLimiter = new Ratelimit({
   analytics: false,
 });
 
+// Per-thread reads (one GET /api/gmail/thread/[id] per visible EmailCard).
+// The inbox renders up to 200 cards on first load and each fires its own
+// fetch — sharing gmailMutationLimiter would 429 most of them. Reads are
+// cheap (1 Gmail quota unit each) so the cap can be loose; we still want
+// SOME bound to catch a runaway loop.
+export const gmailThreadReadLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(300, '60 s'),
+  prefix: 'gmail:thread_read',
+  analytics: false,
+});
+
 // Preview classification requests. Each call hits Claude with up to 20
 // threads of metadata — heavier than a Gmail call. 5/min/user is generous
 // enough for iteration while bounding accidental thrash.
@@ -44,5 +56,26 @@ export const classifyLimiter = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(1, '60 s'),
   prefix: 'classify:run',
+  analytics: false,
+});
+
+// Review queue actions (approve / override / dismiss). 60/min covers a
+// frantic reviewer doing one action per second; the underlying Gmail call
+// inside approve/override is separately gated by gmailMutationLimiter.
+export const queueMutationLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(60, '60 s'),
+  prefix: 'queue:mutation',
+  analytics: false,
+});
+
+// Lightweight Supabase-only reads: /api/queue, /api/buckets, /api/stats,
+// /api/profile. These don't spend Gmail quota, so they don't belong on the
+// 5/min gmailFetchLimiter — five of them all firing on first inbox load
+// (plus React Strict Mode dev double-renders) was tipping users into 429.
+export const appReadLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(60, '60 s'),
+  prefix: 'app:read',
   analytics: false,
 });

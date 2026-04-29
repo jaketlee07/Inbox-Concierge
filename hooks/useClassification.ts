@@ -10,6 +10,8 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { ApiError } from '@/lib/api/fetch';
+import { setAuthRevoked } from '@/lib/auth/revoked';
 import type { FetchThreadsResponse, ThreadClassificationView } from '@/hooks/useThreads';
 
 export interface ClassificationProgress {
@@ -102,7 +104,11 @@ export function useClassification(userId: string): UseClassificationResult {
           const body = (await res.json().catch(() => ({}))) as {
             error?: { code?: string; message?: string };
           };
-          throw new Error(body.error?.message ?? `Request failed (${res.status})`);
+          throw new ApiError(
+            body.error?.message ?? `Request failed (${res.status})`,
+            res.status,
+            body.error?.code,
+          );
         }
         if (!res.body) throw new Error('No response body');
 
@@ -146,6 +152,8 @@ export function useClassification(userId: string): UseClassificationResult {
               setProgress({ classified, total, autoExecuted, queued });
             } else if (event === 'pipeline_complete') {
               setComplete(data as ClassificationSummary);
+              queryClient.invalidateQueries({ queryKey: ['stats', userId] });
+              queryClient.invalidateQueries({ queryKey: ['review-queue', userId] });
             } else if (event === 'pipeline_error') {
               const payload = data as { errorCode: string };
               throw new Error(`Pipeline error: ${payload.errorCode}`);
@@ -156,6 +164,9 @@ export function useClassification(userId: string): UseClassificationResult {
         if (err instanceof DOMException && err.name === 'AbortError') {
           // Cancelled by a subsequent start() or unmount; not an error.
         } else {
+          // Mirror the global QueryClient/MutationCache 401 handler — this hook
+          // doesn't use react-query for its mutation so we trigger directly.
+          if (err instanceof ApiError && err.status === 401) setAuthRevoked();
           setError(err instanceof Error ? err : new Error(String(err)));
         }
       } finally {
@@ -163,7 +174,7 @@ export function useClassification(userId: string): UseClassificationResult {
         if (abortRef.current === controller) abortRef.current = null;
       }
     },
-    [mergeClassifications],
+    [mergeClassifications, queryClient, userId],
   );
 
   return { start, isRunning, progress, complete, error };

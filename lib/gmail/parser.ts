@@ -9,6 +9,32 @@ import type { GmailThread } from '@/types/thread';
 // canonical comparison.
 const SENDER_DOMAIN_RE = /@([\w.-]+?)(?:[>\s]|$)/;
 
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+};
+
+// Gmail returns subject and snippet HTML-entity-encoded (e.g. `&#39;` for `'`).
+// Decode here so all consumers — UI cards, Claude prompts — see clean text.
+export function decodeHtmlEntities(input: string): string {
+  if (!input) return input;
+  return input.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/g, (match, body: string) => {
+    if (body[0] === '#') {
+      const isHex = body[1] === 'x' || body[1] === 'X';
+      const code = parseInt(body.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+      if (Number.isFinite(code) && code >= 0 && code <= 0x10ffff) {
+        return String.fromCodePoint(code);
+      }
+      return match;
+    }
+    return NAMED_ENTITIES[body] ?? match;
+  });
+}
+
 export function getHeader(
   headers: gmail_v1.Schema$MessagePartHeader[] | undefined,
   name: string,
@@ -51,7 +77,7 @@ export function parseThread(raw: gmail_v1.Schema$Thread): GmailThread {
 
   const first = messages[0];
   const last = messages[messages.length - 1];
-  const subject = getHeader(first.payload?.headers, 'Subject') ?? '';
+  const subject = decodeHtmlEntities(getHeader(first.payload?.headers, 'Subject') ?? '');
   const from = getHeader(last.payload?.headers, 'From');
 
   const seenLabels = new Set<string>();
@@ -65,8 +91,8 @@ export function parseThread(raw: gmail_v1.Schema$Thread): GmailThread {
   return {
     id: raw.id,
     subject,
-    latestSnippet: last.snippet ?? '',
-    latestSender: from ?? '',
+    latestSnippet: decodeHtmlEntities(last.snippet ?? ''),
+    latestSender: decodeHtmlEntities(from ?? ''),
     latestSenderDomain: parseSenderDomain(from),
     latestDate,
     isUnread: messages.some((m) => (m.labelIds ?? []).includes('UNREAD')),

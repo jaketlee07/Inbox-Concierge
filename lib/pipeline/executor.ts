@@ -6,6 +6,9 @@ import { isAppError } from '@/lib/errors';
 export interface ExecutorThresholds {
   autoExecute: number;
   queue: number;
+  // When true, the auto-execute branch is unreachable; mid-confidence threads
+  // queue for review instead. Set from profiles.autopilot_paused.
+  paused?: boolean;
 }
 
 // DB enum for classifications.recommended_action — `keep_inbox` is a valid
@@ -58,8 +61,10 @@ export async function executeClassification(
     recommendedAction: dbAction,
   });
 
-  // High-confidence branch.
-  if (classified.confidence >= thresholds.autoExecute) {
+  // High-confidence branch. Pause makes the threshold unreachable so
+  // everything mid-confidence falls through to the queue branch below.
+  const effectiveAutoExecute = thresholds.paused ? 1.01 : thresholds.autoExecute;
+  if (classified.confidence >= effectiveAutoExecute) {
     if (dbAction === 'archive' || dbAction === 'label') {
       // Auto-execute: actionable recommendation, model is confident, do it.
       try {

@@ -77,7 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Parallel reads: thread ownership + bucket list + profile thresholds.
     const [threadsRes, bucketsRes, profileRes] = await Promise.all([
       supabase.from('threads').select('id, gmail_thread_id').in('gmail_thread_id', threadIds),
-      supabase.from('buckets').select('id, name').order('sort_order'),
+      supabase.from('buckets').select('id, name, description').order('sort_order'),
       supabase
         .from('profiles')
         .select('auto_execute_threshold, review_threshold')
@@ -107,9 +107,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const bucketIdByName = new Map<string, string>();
     const bucketNames: string[] = [];
-    for (const b of bucketsRes.data) {
+    const bucketsForPrompt: { name: string; description: string }[] = [];
+    for (const b of bucketsRes.data as { id: string; name: string; description: string }[]) {
       bucketIdByName.set(b.name, b.id);
       bucketNames.push(b.name);
+      bucketsForPrompt.push({ name: b.name, description: b.description });
     }
 
     const thresholds = {
@@ -143,7 +145,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       throw new ValidationError('All threads failed to hydrate');
     }
 
-    const raw = await classifyBatch(hydrated, bucketNames, '');
+    const raw = await classifyBatch(hydrated, bucketsForPrompt, '');
     const classifications = parseClassifyResult(
       raw,
       hydrated.map((t) => t.id),
