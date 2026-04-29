@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useThreads } from '@/hooks/useThreads';
 import { useClassifyPreview } from '@/hooks/useClassifyPreview';
 import type { ClassifiedThread } from '@/lib/claude/parser';
+import type { ExecutionResult } from '@/lib/pipeline/executor';
 
 const BUCKET_BADGE: Record<string, string> = {
   Important: 'bg-red-100 text-red-800 border-red-200',
@@ -11,11 +12,31 @@ const BUCKET_BADGE: Record<string, string> = {
   'Auto-Archive': 'bg-emerald-100 text-emerald-800 border-emerald-200',
   Newsletter: 'bg-blue-100 text-blue-800 border-blue-200',
 };
-const DEFAULT_BADGE = 'bg-neutral-100 text-neutral-700 border-neutral-200';
+const DEFAULT_BUCKET_BADGE = 'bg-neutral-100 text-neutral-700 border-neutral-200';
+
+const STATUS_BADGE: Record<ExecutionResult['status'], { label: string; className: string }> = {
+  auto_executed: {
+    label: 'Auto-execute',
+    className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  },
+  queued: {
+    label: 'Queue for review',
+    className: 'bg-amber-50 text-amber-700 border-amber-200',
+  },
+  bucketed: {
+    label: 'Bucket only',
+    className: 'bg-neutral-50 text-neutral-600 border-neutral-200',
+  },
+};
+
+interface ThreadDecision {
+  classification: ClassifiedThread;
+  status: ExecutionResult['status'];
+}
 
 export function Threads({ userId }: { userId: string }) {
   const { data, isLoading, isError, error, refetch, isFetching } = useThreads(userId);
-  const [classMap, setClassMap] = useState<Map<string, ClassifiedThread>>(new Map());
+  const [decisions, setDecisions] = useState<Map<string, ThreadDecision>>(new Map());
   const classify = useClassifyPreview();
 
   async function handleClassify() {
@@ -23,12 +44,28 @@ export function Threads({ userId }: { userId: string }) {
     const ids = data.threads.slice(0, 20).map((t) => t.id);
     if (ids.length === 0) return;
     const result = await classify.mutateAsync(ids);
-    setClassMap((prev) => {
+    const statusByThread = new Map(result.executorResults.map((r) => [r.threadId, r.status]));
+    setDecisions((prev) => {
       const next = new Map(prev);
-      for (const c of result.classifications) next.set(c.threadId, c);
+      for (const c of result.classifications) {
+        const status = statusByThread.get(c.threadId) ?? 'bucketed';
+        next.set(c.threadId, { classification: c, status });
+      }
       return next;
     });
   }
+
+  const summary = (() => {
+    let auto = 0;
+    let queued = 0;
+    let bucketed = 0;
+    for (const d of decisions.values()) {
+      if (d.status === 'auto_executed') auto += 1;
+      else if (d.status === 'queued') queued += 1;
+      else bucketed += 1;
+    }
+    return { auto, queued, bucketed, total: decisions.size };
+  })();
 
   return (
     <section className="mx-auto max-w-3xl px-6 py-6">
@@ -54,6 +91,18 @@ export function Threads({ userId }: { userId: string }) {
         </div>
       </div>
 
+      {summary.total > 0 && (
+        <div className="mb-3 flex items-center gap-3 rounded-md border border-neutral-200 bg-white px-3 py-2 text-xs">
+          <span className="font-medium text-neutral-700">{summary.total} classified (preview)</span>
+          <span className="text-emerald-700"> {summary.auto} auto-execute</span>
+          <span className="text-amber-700"> {summary.queued} queue</span>
+          <span className="text-neutral-600"> {summary.bucketed} bucket only</span>
+          <span className="ml-auto text-[10px] text-neutral-500">
+            no Gmail actions fired · no DB writes
+          </span>
+        </div>
+      )}
+
       {isLoading && <p className="text-sm text-neutral-500">Fetching threads from Gmail…</p>}
 
       {isError && (
@@ -78,7 +127,6 @@ export function Threads({ userId }: { userId: string }) {
         <>
           <p className="mb-3 text-xs text-neutral-500">
             {data.fetched} fetched, {data.failed.length} failed (of {data.count})
-            {classMap.size > 0 && ` · ${classMap.size} classified`}
             {isFetching && ' · refreshing…'}
           </p>
           {data.threads.length === 0 ? (
@@ -86,17 +134,26 @@ export function Threads({ userId }: { userId: string }) {
           ) : (
             <ul className="divide-y divide-neutral-200 rounded-md border border-neutral-200 bg-white">
               {data.threads.map((t) => {
-                const c = classMap.get(t.id);
+                const d = decisions.get(t.id);
+                const c = d?.classification;
+                const statusBadge = d ? STATUS_BADGE[d.status] : null;
                 return (
                   <li key={t.id} className="px-4 py-3 text-sm">
                     <div className="flex items-baseline justify-between gap-3">
                       <div className="flex min-w-0 items-baseline gap-2">
                         {c && (
                           <span
-                            className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium ${BUCKET_BADGE[c.bucket] ?? DEFAULT_BADGE}`}
+                            className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium ${BUCKET_BADGE[c.bucket] ?? DEFAULT_BUCKET_BADGE}`}
                             title={`${c.recommendedAction} · ${c.reasoning}`}
                           >
                             {c.bucket} {Math.round(c.confidence * 100)}%
+                          </span>
+                        )}
+                        {statusBadge && (
+                          <span
+                            className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium ${statusBadge.className}`}
+                          >
+                            {statusBadge.label}
                           </span>
                         )}
                         <span

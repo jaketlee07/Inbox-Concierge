@@ -2,9 +2,16 @@
 
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import type { ClassifiedThread } from '@/lib/claude/parser';
+import type { ExecutionResult } from '@/lib/pipeline/executor';
+
+export type ExecutorPreview = {
+  threadId: string;
+  status: ExecutionResult['status'];
+};
 
 export type ClassifyPreviewResponse = {
   classifications: ClassifiedThread[];
+  executorResults: ExecutorPreview[];
   hydrationFailed: string[];
 };
 
