@@ -48,6 +48,12 @@ export class OAuthRevokedError extends AppError {
   }
 }
 
+export class ClassificationError extends AppError {
+  constructor(message: string, cause?: unknown) {
+    super('CLASSIFICATION_ERROR', message, 502, cause);
+  }
+}
+
 export function isAppError(e: unknown): e is AppError {
   return e instanceof AppError;
 }
