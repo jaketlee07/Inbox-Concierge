@@ -16,3 +16,14 @@ export const gmailFetchLimiter = new Ratelimit({
   prefix: 'gmail:fetch',
   analytics: false,
 });
+
+// Mutations (archive / label / draft) share one budget. Keeps the user's
+// Gmail-side write rate honest without letting any one operation starve the
+// others. Distinct prefix from the fetch limiter so a stuck read doesn't
+// block writes.
+export const gmailMutationLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(30, '60 s'),
+  prefix: 'gmail:mutation',
+  analytics: false,
+});
