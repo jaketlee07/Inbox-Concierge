@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/server';
+import { ReviewQueue } from '@/components/queue/ReviewQueue';
 import { signOut } from './inbox/actions';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -33,11 +34,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <div className="grid min-h-0 grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px]">
         <main className="min-h-0 overflow-hidden">{children}</main>
         <aside className="hidden border-l border-neutral-200 bg-white md:block">
-          {/* 5.6 ReviewQueue mounts here */}
-          <div className="p-4">
-            <h2 className="text-sm font-semibold text-neutral-900">Review queue</h2>
-            <p className="mt-2 text-sm text-neutral-500">All caught up.</p>
-          </div>
+          <ReviewQueue userId={user.id} />
         </aside>
       </div>
     </div>

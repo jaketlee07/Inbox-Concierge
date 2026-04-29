@@ -1,11 +1,16 @@
 export type SystemBucketName = 'Important' | 'Can Wait' | 'Auto-Archive' | 'Newsletter';
 
+export type BucketDefaultAction = 'archive' | 'label' | null;
+
 export interface SystemBucket {
   name: SystemBucketName;
   color: string;
   description: string;
   sortOrder: number;
   badgeClass: string;
+  // Mirrors buckets.default_action seeded by handle_new_user(). Drives the
+  // client-side optimistic update after an Override.
+  defaultAction: BucketDefaultAction;
 }
 
 export const SYSTEM_BUCKETS: readonly SystemBucket[] = [
@@ -15,6 +20,7 @@ export const SYSTEM_BUCKETS: readonly SystemBucket[] = [
     sortOrder: 1,
     description: 'Email I need to read or act on now.',
     badgeClass: 'bg-red-100 text-red-800 border-red-200',
+    defaultAction: null,
   },
   {
     name: 'Can Wait',
@@ -22,6 +28,7 @@ export const SYSTEM_BUCKETS: readonly SystemBucket[] = [
     sortOrder: 2,
     description: 'Useful but not urgent.',
     badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+    defaultAction: null,
   },
   {
     name: 'Auto-Archive',
@@ -29,6 +36,7 @@ export const SYSTEM_BUCKETS: readonly SystemBucket[] = [
     sortOrder: 3,
     description: 'Receipts, confirmations, automated notifications.',
     badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    defaultAction: 'archive',
   },
   {
     name: 'Newsletter',
@@ -36,6 +44,7 @@ export const SYSTEM_BUCKETS: readonly SystemBucket[] = [
     sortOrder: 4,
     description: 'Subscriptions and digests.',
     badgeClass: 'bg-blue-100 text-blue-800 border-blue-200',
+    defaultAction: 'archive',
   },
 ] as const;
 
