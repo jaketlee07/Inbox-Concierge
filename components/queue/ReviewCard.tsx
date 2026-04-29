@@ -10,6 +10,7 @@ import {
   useDismissReview,
   type QueueItem,
 } from '@/hooks/useReviewQueue';
+import { useBuckets, type BucketView } from '@/hooks/useBuckets';
 import { SYSTEM_BUCKETS, isSystemBucketName, type SystemBucket } from '@/lib/buckets';
 import { Button } from '@/components/ui/Button';
 import { ConfidenceMeter } from '@/components/ui/ConfidenceMeter';
@@ -27,6 +28,7 @@ export function ReviewCard({ userId, item }: ReviewCardProps) {
   const approve = useApproveReview(userId);
   const override = useOverrideReview(userId);
   const dismiss = useDismissReview(userId);
+  const buckets = useBuckets(userId);
   const [showFullReasoning, setShowFullReasoning] = useState(false);
 
   const reasoning =
@@ -109,6 +111,7 @@ export function ReviewCard({ userId, item }: ReviewCardProps) {
           disabled={isPending}
           loading={override.isPending}
           currentBucket={item.bucket}
+          buckets={buckets.data?.buckets ?? []}
           onPick={(bucketName) => override.mutate({ queueId: item.queueId, bucketName })}
         />
         <Button
@@ -129,15 +132,18 @@ function OverrideMenu({
   disabled,
   loading,
   currentBucket,
+  buckets,
   onPick,
 }: {
   disabled: boolean;
   loading: boolean;
   currentBucket: string;
+  buckets: BucketView[];
   onPick: (bucketName: string) => void;
 }) {
   // Native <select> for accessibility + scope. Reset value="" after each
   // change so the user can re-pick if the mutation fails and the card returns.
+  const sorted = [...buckets].sort((a, b) => a.sortOrder - b.sortOrder);
   return (
     <label className="relative inline-flex">
       <span className="sr-only">Override bucket</span>
@@ -158,11 +164,13 @@ function OverrideMenu({
         <option value="" disabled>
           {loading ? 'Overriding…' : 'Override'}
         </option>
-        {SYSTEM_BUCKETS.filter((b) => b.name !== currentBucket).map((b) => (
-          <option key={b.name} value={b.name}>
-            {b.name}
-          </option>
-        ))}
+        {sorted
+          .filter((b) => b.name !== currentBucket)
+          .map((b) => (
+            <option key={b.id} value={b.name}>
+              {b.name}
+            </option>
+          ))}
       </select>
       <span
         aria-hidden="true"

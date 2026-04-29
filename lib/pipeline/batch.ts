@@ -34,7 +34,7 @@ export type BatchResult =
 // sibling batches.
 export async function runBatches(
   threads: readonly GmailThread[],
-  buckets: readonly string[],
+  buckets: readonly { name: string; description: string }[],
   userOverridesSummary: string,
   onBatchComplete?: (result: BatchResult) => Promise<void>,
 ): Promise<BatchResult[]> {
@@ -62,14 +62,15 @@ export async function runBatches(
 
 async function runOneBatch(
   threads: readonly GmailThread[],
-  buckets: readonly string[],
+  buckets: readonly { name: string; description: string }[],
   userOverridesSummary: string,
 ): Promise<BatchResult> {
   const threadIds = threads.map((t) => t.id);
+  const bucketNames = buckets.map((b) => b.name);
   const start = Date.now();
   try {
     const raw = await classifyBatch(threads, buckets, userOverridesSummary);
-    const classifications = parseClassifyResult(raw, threadIds, buckets);
+    const classifications = parseClassifyResult(raw, threadIds, bucketNames);
     logger.info('batch.success', {
       durationMs: Date.now() - start,
     });

@@ -3,4 +3,4 @@
 -- Read by /api/classify when constructing ExecutorThresholds.
 
 ALTER TABLE public.profiles
-  ADD COLUMN autopilot_paused boolean NOT NULL DEFAULT false;
+  ADD COLUMN IF NOT EXISTS autopilot_paused boolean NOT NULL DEFAULT false;

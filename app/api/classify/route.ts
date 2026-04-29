@@ -89,12 +89,12 @@ export async function POST(request: NextRequest): Promise<Response> {
   // ── Pre-stream data fetch ────────────────────────────────────────────────
   let pendingThreads: Awaited<ReturnType<typeof getThreadsToClassify>>;
   let bucketIdByName: Map<string, string>;
-  let bucketNames: string[];
+  let bucketsForPrompt: { name: string; description: string }[];
   let thresholds: { autoExecute: number; queue: number; paused: boolean };
   try {
     const [threadsRes, bucketsRes, profileRes] = await Promise.all([
       getThreadsToClassify(supabase, userId, force),
-      supabase.from('buckets').select('id, name').order('sort_order'),
+      supabase.from('buckets').select('id, name, description').order('sort_order'),
       supabase
         .from('profiles')
         .select('auto_execute_threshold, review_threshold, autopilot_paused')
@@ -112,10 +112,10 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     pendingThreads = threadsRes;
     bucketIdByName = new Map<string, string>();
-    bucketNames = [];
-    for (const b of bucketsRes.data) {
+    bucketsForPrompt = [];
+    for (const b of bucketsRes.data as { id: string; name: string; description: string }[]) {
       bucketIdByName.set(b.name, b.id);
-      bucketNames.push(b.name);
+      bucketsForPrompt.push({ name: b.name, description: b.description });
     }
     thresholds = {
       autoExecute: Number(profileRes.data.auto_execute_threshold),
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       });
 
       try {
-        await runBatches(hydrated, bucketNames, '', async (result) => {
+        await runBatches(hydrated, bucketsForPrompt, '', async (result) => {
           if (result.status === 'failed') {
             const dbIds = result.threadIds
               .map((g) => dbThreadIdByGmail.get(g))

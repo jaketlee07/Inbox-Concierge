@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import type { GmailThread } from '@/types/thread';
 import { useThreads } from '@/hooks/useThreads';
 import { useClassification } from '@/hooks/useClassification';
-import { SYSTEM_BUCKETS, isSystemBucketName, type SystemBucketName } from '@/lib/buckets';
+import { useBuckets } from '@/hooks/useBuckets';
 import { Button } from '@/components/ui/Button';
 import { BucketColumn } from '@/components/inbox/BucketColumn';
 import { EmailCard } from '@/components/inbox/EmailCard';
@@ -16,9 +16,16 @@ interface InboxViewProps {
 export function InboxView({ userId }: InboxViewProps) {
   const { data, isLoading, isError, error, refetch, isFetching } = useThreads(userId);
   const classification = useClassification(userId);
+  const buckets = useBuckets(userId);
+
+  const sortedBuckets = useMemo(
+    () => [...(buckets.data?.buckets ?? [])].sort((a, b) => a.sortOrder - b.sortOrder),
+    [buckets.data],
+  );
 
   const grouped = useMemo(() => {
-    const map = new Map<SystemBucketName, GmailThread[]>(SYSTEM_BUCKETS.map((b) => [b.name, []]));
+    const map = new Map<string, GmailThread[]>();
+    for (const b of sortedBuckets) map.set(b.name, []);
     let unclassified = 0;
     for (const t of data?.threads ?? []) {
       const c = data?.classifications?.[t.id];
@@ -26,14 +33,16 @@ export function InboxView({ userId }: InboxViewProps) {
         unclassified += 1;
         continue;
       }
-      if (!isSystemBucketName(c.bucket)) continue;
-      map.get(c.bucket)?.push(t);
+      const arr = map.get(c.bucket);
+      // Bucket no longer in user's list (e.g., recently deleted) — drop silently;
+      // the next reclassify will re-route this thread.
+      if (arr) arr.push(t);
     }
     for (const arr of map.values()) {
       arr.sort((a, b) => Date.parse(b.latestDate) - Date.parse(a.latestDate));
     }
     return { map, unclassified };
-  }, [data]);
+  }, [data, sortedBuckets]);
 
   const totalThreads = data?.threads.length ?? 0;
   const canClassify = totalThreads > 0 && !classification.isRunning;
@@ -102,14 +111,23 @@ export function InboxView({ userId }: InboxViewProps) {
           </div>
         )}
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-auto p-4 md:grid-cols-[repeat(4,minmax(280px,1fr))] md:overflow-hidden">
-        {SYSTEM_BUCKETS.map((b) => (
+      <div
+        className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-auto p-4 md:overflow-x-auto md:overflow-y-hidden"
+        // dynamic column count — Tailwind JIT can't generate runtime grid-template strings
+        style={{
+          gridTemplateColumns:
+            sortedBuckets.length > 0
+              ? `repeat(${sortedBuckets.length}, minmax(280px, 1fr))`
+              : undefined,
+        }}
+      >
+        {sortedBuckets.map((b) => (
           <BucketColumn
-            key={b.name}
+            key={b.id}
             bucket={b}
             threads={grouped.map.get(b.name) ?? []}
             classifications={data?.classifications}
-            isLoading={isLoading}
+            isLoading={isLoading || buckets.isLoading}
             renderItem={(thread, c) => <EmailCard threadId={thread.id} classification={c} />}
           />
         ))}

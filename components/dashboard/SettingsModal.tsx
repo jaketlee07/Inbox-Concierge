@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Slider from '@radix-ui/react-slider';
-import { RotateCw } from 'lucide-react';
+import { RotateCw, FolderPlus } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { BucketManager } from '@/components/buckets/BucketManager';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { useClassification } from '@/hooks/useClassification';
 
@@ -32,6 +33,7 @@ export function SettingsModal({ userId, open, onOpenChange }: SettingsModalProps
   const [queue, setQueue] = useState(0.7);
   const [paused, setPaused] = useState(false);
   const [confirmReclassifyOpen, setConfirmReclassifyOpen] = useState(false);
+  const [bucketManagerOpen, setBucketManagerOpen] = useState(false);
 
   // Re-seed local state when the modal transitions to open with loaded data,
   // or when profile.data refreshes while open. Canonical React 19 pattern:
@@ -145,6 +147,13 @@ export function SettingsModal({ userId, open, onOpenChange }: SettingsModalProps
               </span>
             </label>
             <div className="border-t border-neutral-200 pt-4">
+              <Button variant="secondary" size="sm" onClick={() => setBucketManagerOpen(true)}>
+                <FolderPlus className="h-3 w-3" aria-hidden="true" />
+                Manage buckets
+              </Button>
+              <p className="mt-1 text-xs text-neutral-500">Add or remove custom buckets.</p>
+            </div>
+            <div className="border-t border-neutral-200 pt-4">
               <Button
                 variant="danger"
                 size="sm"
@@ -183,6 +192,14 @@ export function SettingsModal({ userId, open, onOpenChange }: SettingsModalProps
           You can&apos;t undo Gmail mutations once they fire.
         </p>
       </Modal>
+
+      {bucketManagerOpen && (
+        <BucketManager
+          userId={userId}
+          open={bucketManagerOpen}
+          onOpenChange={setBucketManagerOpen}
+        />
+      )}
     </>
   );
 }

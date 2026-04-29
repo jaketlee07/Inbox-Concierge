@@ -5,7 +5,7 @@ import { FixedSizeList, type ListChildComponentProps } from 'react-window';
 import { Inbox } from 'lucide-react';
 import type { GmailThread } from '@/types/thread';
 import type { ThreadClassificationView } from '@/hooks/useThreads';
-import type { SystemBucket } from '@/lib/buckets';
+import type { BucketView } from '@/hooks/useBuckets';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 const ROW_HEIGHT = 112;
@@ -13,7 +13,7 @@ const VIRTUALIZE_THRESHOLD = 50;
 const DESKTOP_QUERY = '(min-width: 768px)';
 
 interface BucketColumnProps {
-  bucket: SystemBucket;
+  bucket: BucketView;
   threads: GmailThread[];
   classifications?: Record<string, ThreadClassificationView>;
   isLoading: boolean;

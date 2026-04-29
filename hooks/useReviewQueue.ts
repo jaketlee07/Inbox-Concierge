@@ -9,7 +9,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { toast } from '@/components/ui/Toast';
-import { SYSTEM_BUCKETS } from '@/lib/buckets';
+import type { BucketsResponse } from '@/hooks/useBuckets';
 import type { FetchThreadsResponse, ThreadClassificationView } from '@/hooks/useThreads';
 
 export type RecommendedAction = 'archive' | 'label' | 'none';
@@ -156,7 +156,11 @@ export function useOverrideReview(
     fn: (vars) => postJson('/api/queue/override', vars),
     errorLabel: "Couldn't override",
     applyToThreads: (item, vars, qc) => {
-      const newBucket = SYSTEM_BUCKETS.find((b) => b.name === vars.bucketName);
+      // Read default_action from the live buckets cache so custom buckets work
+      // too. If the cache is empty (rare), fall back to no action — server is
+      // authoritative and will refresh state on next ['threads'] read.
+      const bucketsCache = qc.getQueryData<BucketsResponse>(['buckets', userId]);
+      const newBucket = bucketsCache?.buckets.find((b) => b.name === vars.bucketName);
       const newAction = newBucket?.defaultAction ?? null;
       patchClassification(qc, userId, item.threadId, {
         bucket: vars.bucketName,
