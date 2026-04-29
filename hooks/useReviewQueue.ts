@@ -11,6 +11,7 @@ import {
 import { toast } from '@/components/ui/Toast';
 import { apiFetch } from '@/lib/api/fetch';
 import type { BucketsResponse } from '@/hooks/useBuckets';
+import type { StatsResponse } from '@/hooks/useStats';
 import type { FetchThreadsResponse, ThreadClassificationView } from '@/hooks/useThreads';
 
 export type RecommendedAction = 'archive' | 'label' | 'none';
@@ -84,6 +85,20 @@ function patchClassification(
   });
 }
 
+// Optimistically nudge the stats counters in-cache so the AutopilotBar reflects
+// the action immediately without a /api/stats round-trip. Server is still
+// authoritative on next window-focus refetch.
+function patchStats(queryClient: QueryClient, userId: string, delta: Partial<StatsResponse>): void {
+  queryClient.setQueryData<StatsResponse | undefined>(['stats', userId], (prev) => {
+    if (!prev) return prev;
+    return {
+      autoHandledToday: Math.max(0, prev.autoHandledToday + (delta.autoHandledToday ?? 0)),
+      queuedForReview: Math.max(0, prev.queuedForReview + (delta.queuedForReview ?? 0)),
+      overridesThisWeek: Math.max(0, prev.overridesThisWeek + (delta.overridesThisWeek ?? 0)),
+    };
+  });
+}
+
 function useOptimisticQueueMutation<TVars extends { queueId: string }>(args: {
   userId: string;
   fn: (vars: TVars) => Promise<void>;
@@ -113,10 +128,11 @@ function useOptimisticQueueMutation<TVars extends { queueId: string }>(args: {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['review-queue', args.userId] });
-      queryClient.invalidateQueries({ queryKey: ['stats', args.userId] });
-      // Intentionally NOT invalidating ['threads', userId] — applyToThreads
-      // already patched the cache. The slow /api/gmail/fetch-threads refetch
-      // would just re-confirm the same state 5–15s later.
+      // Stats are patched optimistically in each mutation's applyToThreads
+      // callback — skip the /api/stats invalidation that previously fired
+      // 1–3 round-trips per click. Server reconciles on next window focus.
+      // Threads cache is also patched in applyToThreads; re-fetching would
+      // just re-confirm the same state 5–15 s later.
     },
   });
 }
@@ -129,8 +145,13 @@ export function useApproveReview(
     fn: (vars) => postJson('/api/queue/approve', vars),
     errorLabel: "Couldn't approve",
     applyToThreads: (item, _vars, qc) => {
+      const willExecute = item.recommendedAction !== 'none';
       patchClassification(qc, userId, item.threadId, {
-        status: item.recommendedAction === 'none' ? 'bucketed' : 'auto_executed',
+        status: willExecute ? 'auto_executed' : 'bucketed',
+      });
+      patchStats(qc, userId, {
+        queuedForReview: -1,
+        autoHandledToday: willExecute ? 1 : 0,
       });
     },
   });
@@ -155,6 +176,11 @@ export function useOverrideReview(
         recommendedAction: newAction ?? 'none',
         status: newAction === null ? 'bucketed' : 'auto_executed',
       });
+      patchStats(qc, userId, {
+        queuedForReview: -1,
+        overridesThisWeek: 1,
+        autoHandledToday: newAction !== null ? 1 : 0,
+      });
     },
   });
 }
@@ -168,6 +194,7 @@ export function useDismissReview(
     errorLabel: "Couldn't dismiss",
     applyToThreads: (item, _vars, qc) => {
       patchClassification(qc, userId, item.threadId, { status: 'bucketed' });
+      patchStats(qc, userId, { queuedForReview: -1 });
     },
   });
 }

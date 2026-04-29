@@ -28,18 +28,6 @@ export const gmailMutationLimiter = new Ratelimit({
   analytics: false,
 });
 
-// Per-thread reads (one GET /api/gmail/thread/[id] per visible EmailCard).
-// The inbox renders up to 200 cards on first load and each fires its own
-// fetch — sharing gmailMutationLimiter would 429 most of them. Reads are
-// cheap (1 Gmail quota unit each) so the cap can be loose; we still want
-// SOME bound to catch a runaway loop.
-export const gmailThreadReadLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(300, '60 s'),
-  prefix: 'gmail:thread_read',
-  analytics: false,
-});
-
 // Preview classification requests. Each call hits Claude with up to 20
 // threads of metadata — heavier than a Gmail call. 5/min/user is generous
 // enough for iteration while bounding accidental thrash.

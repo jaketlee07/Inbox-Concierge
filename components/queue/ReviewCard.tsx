@@ -1,9 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useLiveThreadContent } from '@/hooks/useLiveThreadContent';
-import type { FetchThreadsResponse } from '@/hooks/useThreads';
+import { useThreads } from '@/hooks/useThreads';
 import {
   useApproveReview,
   useOverrideReview,
@@ -24,18 +22,21 @@ interface ReviewCardProps {
 }
 
 export function ReviewCard({ userId, item }: ReviewCardProps) {
-  const { data: thread, isLoading, isError } = useLiveThreadContent(item.threadId);
-  const queryClient = useQueryClient();
+  // Share the inbox's threads cache instead of re-fetching per card. TanStack
+  // Query dedupes the request so this hook joins the existing in-flight or
+  // cached useThreads(userId) — no extra network call. Privacy contract holds:
+  // thread metadata stays in-memory and is never persisted.
+  const threadsQuery = useThreads(userId);
+  const thread = threadsQuery.data?.threads.find((t) => t.id === item.threadId);
+  const isLoading = threadsQuery.isLoading;
+  const isMissing = !threadsQuery.isLoading && !thread;
   const approve = useApproveReview(userId);
   const override = useOverrideReview(userId);
   const dismiss = useDismissReview(userId);
   const buckets = useBuckets(userId);
   const [showFullReasoning, setShowFullReasoning] = useState(false);
 
-  const reasoning =
-    queryClient.getQueryData<FetchThreadsResponse>(['threads', userId])?.classifications?.[
-      item.threadId
-    ]?.reasoning ?? '';
+  const reasoning = threadsQuery.data?.classifications?.[item.threadId]?.reasoning ?? '';
 
   const bucketMeta: SystemBucket | undefined = isSystemBucketName(item.bucket)
     ? SYSTEM_BUCKETS.find((b) => b.name === item.bucket)
@@ -66,7 +67,7 @@ export function ReviewCard({ userId, item }: ReviewCardProps) {
           <Skeleton className="h-3 w-3/4" />
           <Skeleton className="h-3 w-full" />
         </div>
-      ) : isError || !thread ? (
+      ) : isMissing || !thread ? (
         <div className="text-xs text-neutral-500 italic">Couldn&apos;t load preview.</div>
       ) : (
         <div>

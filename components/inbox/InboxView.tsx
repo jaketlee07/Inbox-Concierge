@@ -94,7 +94,19 @@ export function InboxView({ userId }: InboxViewProps) {
           )}
           {grouped.unclassified > 0 && !classification.isRunning && (
             <span>
-              {grouped.unclassified} unclassified — click <strong>Classify</strong> to bucket.
+              {grouped.unclassified} unclassified — click{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  recordUserAction('classify_started', { force: false });
+                  void classification.start();
+                }}
+                disabled={!canClassify}
+                className="font-semibold text-neutral-700 underline underline-offset-2 hover:text-neutral-900 focus-visible:rounded focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:outline-none disabled:cursor-not-allowed disabled:text-neutral-400 disabled:no-underline"
+              >
+                Classify
+              </button>{' '}
+              to bucket.
             </span>
           )}
         </div>
@@ -114,12 +126,13 @@ export function InboxView({ userId }: InboxViewProps) {
               <Button
                 variant="secondary"
                 size="sm"
+                loading={isFetching || buckets.isFetching}
                 onClick={() => {
-                  // Retry both queries — they often fail together (rate-limit
-                  // cascade), so retrying just one leaves the inbox in a
-                  // half-loaded state with no columns to render into.
-                  if (isError) void refetch();
-                  if (buckets.isError) void buckets.refetch();
+                  // Always refetch both — a 429 cascade can leave one cache in
+                  // a stale-empty success state while the other is in error,
+                  // so refetching just the errored one leaves the inbox blank
+                  // with "200 fetched" but no columns. Hit them together.
+                  void Promise.all([refetch(), buckets.refetch()]);
                 }}
               >
                 Retry
@@ -144,8 +157,11 @@ export function InboxView({ userId }: InboxViewProps) {
         </div>
       ) : (
         <div
-          className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-auto p-4 md:overflow-x-auto md:overflow-y-hidden"
-          // dynamic column count — Tailwind JIT can't generate runtime grid-template strings
+          className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-auto p-4 md:grid-rows-[minmax(0,1fr)] md:overflow-x-auto md:overflow-y-hidden"
+          // dynamic column count — Tailwind JIT can't generate runtime grid-template strings.
+          // grid-rows-[minmax(0,1fr)] (desktop) pins the implicit row to the parent's
+          // bounded height so a tall column (Newsletter w/ 180 items) doesn't blow the
+          // row out and defeat the per-column overflow-auto in BucketColumn.
           style={{
             gridTemplateColumns:
               sortedBuckets.length > 0
@@ -160,7 +176,7 @@ export function InboxView({ userId }: InboxViewProps) {
               threads={grouped.map.get(b.name) ?? []}
               classifications={data?.classifications}
               isLoading={isLoading || buckets.isLoading}
-              renderItem={(thread, c) => <EmailCard threadId={thread.id} classification={c} />}
+              renderItem={(thread, c) => <EmailCard thread={thread} classification={c} />}
             />
           ))}
         </div>

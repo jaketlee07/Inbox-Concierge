@@ -71,20 +71,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const dbThreadId = row.classifications.threads.id;
     const nowIso = new Date().toISOString();
 
-    const { error: threadErr } = await supabase
-      .from('threads')
-      .update({ classification_status: 'classified' })
-      .eq('id', dbThreadId);
-    if (threadErr) {
-      throw new AppError('DB_UPDATE_FAILED', 'Failed to update thread status', 500, threadErr);
+    // Both writes are independent — parallelize.
+    const [threadRes, queueRes] = await Promise.all([
+      supabase.from('threads').update({ classification_status: 'classified' }).eq('id', dbThreadId),
+      supabase
+        .from('review_queue')
+        .update({ status: 'dismissed', resolved_at: nowIso })
+        .eq('id', queueId),
+    ]);
+    if (threadRes.error) {
+      throw new AppError(
+        'DB_UPDATE_FAILED',
+        'Failed to update thread status',
+        500,
+        threadRes.error,
+      );
     }
-
-    const { error: queueErr } = await supabase
-      .from('review_queue')
-      .update({ status: 'dismissed', resolved_at: nowIso })
-      .eq('id', queueId);
-    if (queueErr) {
-      throw new AppError('DB_UPDATE_FAILED', 'Failed to update review queue', 500, queueErr);
+    if (queueRes.error) {
+      throw new AppError('DB_UPDATE_FAILED', 'Failed to update review queue', 500, queueRes.error);
     }
 
     logger.info('queue.dismiss.complete', {
