@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/server';
+import { AutopilotBar } from '@/components/dashboard/AutopilotBar';
 import { ReviewQueue } from '@/components/queue/ReviewQueue';
 import { signOut } from './inbox/actions';
 
@@ -16,8 +17,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <header className="flex items-center justify-between border-b border-neutral-200 bg-white px-6 py-3">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold text-neutral-900">Inbox Concierge</h1>
-          {/* 5.9 AutopilotBar mounts here */}
-          <div data-slot="autopilot-bar" className="min-h-9" />
+          <AutopilotBar userId={user.id} />
         </div>
         <div className="flex items-center gap-3 text-sm">
           <span className="text-neutral-600">{user.email}</span>

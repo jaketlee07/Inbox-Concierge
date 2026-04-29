@@ -125,6 +125,7 @@ function useOptimisticQueueMutation<TVars extends { queueId: string }>(args: {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['review-queue', args.userId] });
+      queryClient.invalidateQueries({ queryKey: ['stats', args.userId] });
       // Intentionally NOT invalidating ['threads', userId] — applyToThreads
       // already patched the cache. The slow /api/gmail/fetch-threads refetch
       // would just re-confirm the same state 5–15s later.

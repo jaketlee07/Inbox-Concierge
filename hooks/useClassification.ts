@@ -146,6 +146,8 @@ export function useClassification(userId: string): UseClassificationResult {
               setProgress({ classified, total, autoExecuted, queued });
             } else if (event === 'pipeline_complete') {
               setComplete(data as ClassificationSummary);
+              queryClient.invalidateQueries({ queryKey: ['stats', userId] });
+              queryClient.invalidateQueries({ queryKey: ['review-queue', userId] });
             } else if (event === 'pipeline_error') {
               const payload = data as { errorCode: string };
               throw new Error(`Pipeline error: ${payload.errorCode}`);
@@ -163,7 +165,7 @@ export function useClassification(userId: string): UseClassificationResult {
         if (abortRef.current === controller) abortRef.current = null;
       }
     },
-    [mergeClassifications],
+    [mergeClassifications, queryClient, userId],
   );
 
   return { start, isRunning, progress, complete, error };

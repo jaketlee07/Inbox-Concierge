@@ -90,14 +90,14 @@ export async function POST(request: NextRequest): Promise<Response> {
   let pendingThreads: Awaited<ReturnType<typeof getThreadsToClassify>>;
   let bucketIdByName: Map<string, string>;
   let bucketNames: string[];
-  let thresholds: { autoExecute: number; queue: number };
+  let thresholds: { autoExecute: number; queue: number; paused: boolean };
   try {
     const [threadsRes, bucketsRes, profileRes] = await Promise.all([
       getThreadsToClassify(supabase, userId, force),
       supabase.from('buckets').select('id, name').order('sort_order'),
       supabase
         .from('profiles')
-        .select('auto_execute_threshold, review_threshold')
+        .select('auto_execute_threshold, review_threshold, autopilot_paused')
         .eq('id', userId)
         .single(),
     ]);
@@ -120,6 +120,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     thresholds = {
       autoExecute: Number(profileRes.data.auto_execute_threshold),
       queue: Number(profileRes.data.review_threshold),
+      paused: profileRes.data.autopilot_paused,
     };
   } catch (err) {
     logger.error(
