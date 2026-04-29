@@ -8,7 +8,7 @@ import type { ThreadClassificationView } from '@/hooks/useThreads';
 import type { SystemBucket } from '@/lib/buckets';
 import { Skeleton } from '@/components/ui/Skeleton';
 
-const ROW_HEIGHT = 88;
+const ROW_HEIGHT = 112;
 const VIRTUALIZE_THRESHOLD = 50;
 const DESKTOP_QUERY = '(min-width: 768px)';
 

@@ -2,25 +2,16 @@
 
 import { useMemo } from 'react';
 import type { GmailThread } from '@/types/thread';
-import { useThreads, type ThreadClassificationView } from '@/hooks/useThreads';
+import { useThreads } from '@/hooks/useThreads';
 import { useClassification } from '@/hooks/useClassification';
 import { SYSTEM_BUCKETS, isSystemBucketName, type SystemBucketName } from '@/lib/buckets';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { BucketColumn } from '@/components/inbox/BucketColumn';
+import { EmailCard } from '@/components/inbox/EmailCard';
 
 interface InboxViewProps {
   userId: string;
 }
-
-const STATUS_BADGE: Record<
-  ThreadClassificationView['status'],
-  { label: string; variant: 'success' | 'warning' | 'default' }
-> = {
-  auto_executed: { label: 'Auto-execute', variant: 'success' },
-  queued: { label: 'Queue', variant: 'warning' },
-  bucketed: { label: 'Bucket only', variant: 'default' },
-};
 
 export function InboxView({ userId }: InboxViewProps) {
   const { data, isLoading, isError, error, refetch, isFetching } = useThreads(userId);
@@ -119,58 +110,10 @@ export function InboxView({ userId }: InboxViewProps) {
             threads={grouped.map.get(b.name) ?? []}
             classifications={data?.classifications}
             isLoading={isLoading}
-            renderItem={(thread, c) => <InlineThreadCard thread={thread} classification={c} />}
+            renderItem={(thread, c) => <EmailCard threadId={thread.id} classification={c} />}
           />
         ))}
       </div>
     </div>
-  );
-}
-
-// TODO(5.5): replace with EmailCard that uses useLiveThreadContent for skeleton-then-live render.
-function InlineThreadCard({
-  thread,
-  classification,
-}: {
-  thread: GmailThread;
-  classification?: ThreadClassificationView;
-}) {
-  const status = classification ? STATUS_BADGE[classification.status] : null;
-  const date = thread.latestDate ? new Date(thread.latestDate) : null;
-  return (
-    <a
-      href={`https://mail.google.com/mail/u/0/#inbox/${encodeURIComponent(thread.id)}`}
-      target="_blank"
-      rel="noreferrer"
-      className="block px-3 py-2 transition hover:bg-neutral-50"
-    >
-      <div className="flex items-baseline justify-between gap-2">
-        <span
-          className={
-            thread.isUnread
-              ? 'truncate text-sm font-semibold text-neutral-900'
-              : 'truncate text-sm text-neutral-700'
-          }
-        >
-          {thread.subject || '(no subject)'}
-        </span>
-        {date && (
-          <span className="shrink-0 text-[10px] text-neutral-500">
-            {date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-          </span>
-        )}
-      </div>
-      <div className="mt-0.5 truncate text-xs text-neutral-500">
-        {thread.latestSender || '(unknown sender)'}
-        {thread.messageCount > 1 && ` · ${thread.messageCount} msgs`}
-      </div>
-      <div className="mt-1 line-clamp-1 text-xs text-neutral-600">{thread.latestSnippet}</div>
-      {classification && (
-        <div className="mt-1 flex items-center gap-1">
-          {status && <Badge variant={status.variant}>{status.label}</Badge>}
-          <Badge variant="default">{Math.round(classification.confidence * 100)}%</Badge>
-        </div>
-      )}
-    </a>
   );
 }

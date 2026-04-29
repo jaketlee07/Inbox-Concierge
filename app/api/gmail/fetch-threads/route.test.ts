@@ -5,7 +5,13 @@ import { NextRequest } from 'next/server';
 
 const supabaseAuth = { getUser: vi.fn<() => Promise<unknown>>() };
 const supabaseUpsert = vi.fn<(...args: unknown[]) => Promise<unknown>>();
-const supabaseFrom = vi.fn(() => ({ upsert: supabaseUpsert }));
+const classificationsEq = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+const supabaseFrom = vi.fn((table: string) => {
+  if (table === 'classifications') {
+    return { select: () => ({ eq: classificationsEq }) };
+  }
+  return { upsert: supabaseUpsert };
+});
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
@@ -67,6 +73,10 @@ beforeEach(() => {
   supabaseAuth.getUser.mockReset();
   supabaseUpsert.mockReset();
   supabaseFrom.mockClear();
+  classificationsEq.mockReset();
+  // Default: no persisted classifications. Tests that exercise rehydration
+  // override with mockResolvedValueOnce.
+  classificationsEq.mockResolvedValue({ data: [], error: null });
   limiterLimit.mockReset();
   clientList.mockReset();
   clientGet.mockReset();
