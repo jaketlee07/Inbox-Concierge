@@ -42,6 +42,12 @@ export class ExternalApiError extends AppError {
   }
 }
 
+export class OAuthRevokedError extends AppError {
+  constructor(message = 'OAuth refresh token revoked', cause?: unknown) {
+    super('OAUTH_REVOKED', message, 401, cause);
+  }
+}
+
 export function isAppError(e: unknown): e is AppError {
   return e instanceof AppError;
 }

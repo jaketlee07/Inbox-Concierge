@@ -45,6 +45,8 @@ jobs:
           # Real values are set in Vercel project settings.
           NODE_ENV: production
           SUPABASE_SERVICE_ROLE_KEY: ci-dummy
+          GOOGLE_CLIENT_ID: ci-dummy
+          GOOGLE_CLIENT_SECRET: ci-dummy
           ANTHROPIC_API_KEY: sk-ant-ci-dummy
           UPSTASH_REDIS_REST_URL: https://ci-dummy.upstash.io
           UPSTASH_REDIS_REST_TOKEN: ci-dummy
