@@ -69,6 +69,21 @@ export function useClassification(userId: string): UseClassificationResult {
         }
         return { ...prev, classifications: next };
       });
+      // Persist reasoning to localStorage so it survives a refresh without
+      // crossing the server boundary. The Postgres privacy invariant ("never
+      // store reasoning server-side") is unchanged — this is on-device only.
+      if (typeof window !== 'undefined') {
+        for (const e of entries) {
+          if (e.reasoning) {
+            try {
+              window.localStorage.setItem(`ic:reasoning:${userId}:${e.threadId}`, e.reasoning);
+            } catch {
+              // localStorage can throw on quota or in private mode; reasoning
+              // visibility is best-effort, so swallow.
+            }
+          }
+        }
+      }
     },
     [queryClient, userId],
   );

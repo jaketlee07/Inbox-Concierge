@@ -9,7 +9,7 @@ and a list of buckets, each with a name and a description. For each thread, you 
 1. Assign it to exactly one bucket from the provided list, using the bucket's name AND description as guidance
 2. Estimate your confidence as a number between 0 and 1
 3. Recommend an action: "archive", "label", "keep_inbox", or "none"
-4. Provide a brief reasoning (under 120 characters)
+4. Provide a brief reasoning, 1 to 120 characters. Never return an empty string — always include the concrete signal you used (sender, subject pattern, language cue, etc.)
 
 Confidence calibration:
 - 0.95+: obvious, e.g. promotional newsletter from known sender

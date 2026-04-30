@@ -151,6 +151,24 @@ describe('parseClassifyResult', () => {
       );
     });
 
+    it('throws when reasoning is an empty string', () => {
+      const raw = {
+        classifications: [classification({ thread_id: '18c7d5f2a1b3c4d5', reasoning: '' })],
+      };
+      expect(() => parseClassifyResult(raw, ['18c7d5f2a1b3c4d5'], BUCKETS)).toThrow(
+        /Invalid response shape/,
+      );
+    });
+
+    it('throws when reasoning is whitespace-only', () => {
+      const raw = {
+        classifications: [classification({ thread_id: '18c7d5f2a1b3c4d5', reasoning: '   ' })],
+      };
+      expect(() => parseClassifyResult(raw, ['18c7d5f2a1b3c4d5'], BUCKETS)).toThrow(
+        /Invalid response shape/,
+      );
+    });
+
     it('throws when recommended_action is not in the enum', () => {
       const raw = {
         classifications: [

@@ -9,7 +9,7 @@ const ItemSchema = z.object({
   bucket: z.string().min(1),
   confidence: z.number().min(0).max(1),
   recommended_action: z.enum(['archive', 'label', 'keep_inbox', 'none']),
-  reasoning: z.string().max(120),
+  reasoning: z.string().trim().min(1).max(120),
 });
 
 const ResultSchema = z.object({

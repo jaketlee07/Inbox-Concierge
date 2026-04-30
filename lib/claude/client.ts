@@ -53,7 +53,7 @@ const classifyTool: Anthropic.Tool = {
               type: 'string',
               enum: ['archive', 'label', 'keep_inbox', 'none'],
             },
-            reasoning: { type: 'string', maxLength: 120 },
+            reasoning: { type: 'string', minLength: 1, maxLength: 120 },
           },
           required: ['thread_id', 'bucket', 'confidence', 'recommended_action', 'reasoning'],
           additionalProperties: false,
