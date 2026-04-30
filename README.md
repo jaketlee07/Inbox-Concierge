@@ -1,8 +1,7 @@
 # Inbox Concierge
 
-[Live Demo](https://inbox-concierge-nu.vercel.app)
-[Demo Video](https://youtu.be/nNMN9R6wr0U)
-
+- [Live Demo](https://inbox-concierge-nu.vercel.app)                                                                     
+- [Demo Video](https://youtu.be/nNMN9R6wr0U)  
 
 An AI-powered Gmail triage system. Sign in with Google, and Claude reads the metadata of your most recent ~200 threads, sorts them into buckets (Important / Can Wait / Auto-Archive / Newsletter, plus any custom ones you create), and — when it's confident — fires the right Gmail action automatically. When it's not confident, the thread lands in a sidebar review queue you can approve, override, or dismiss.
 
