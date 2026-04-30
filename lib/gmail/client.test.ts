@@ -254,6 +254,39 @@ describe('GmailClient.addLabel', () => {
     });
   });
 
+  it('reuses a system label via case-insensitive match (Important → IMPORTANT)', async () => {
+    mocks.labelsList.mockResolvedValueOnce({
+      data: { labels: [{ id: 'IMPORTANT', name: 'IMPORTANT', type: 'system' }] },
+    });
+    mocks.threadsModify.mockResolvedValueOnce({ data: {} });
+    const { GmailClient } = await loadClient();
+
+    await new GmailClient('u1').addLabel('t1', 'Important');
+    expect(mocks.labelsCreate).not.toHaveBeenCalled();
+    expect(mocks.threadsModify.mock.calls[0][0]).toMatchObject({
+      requestBody: { addLabelIds: ['IMPORTANT'] },
+    });
+  });
+
+  it('does not case-insensitive-match user labels (only system labels)', async () => {
+    // A user-created label "important" (lowercase) must NOT shadow the
+    // intent to use Gmail's IMPORTANT system label or to create "Important".
+    mocks.labelsList.mockResolvedValueOnce({
+      data: { labels: [{ id: 'L_user', name: 'important', type: 'user' }] },
+    });
+    mocks.labelsCreate.mockResolvedValueOnce({
+      data: { id: 'L_new', name: 'Important' },
+    });
+    mocks.threadsModify.mockResolvedValueOnce({ data: {} });
+    const { GmailClient } = await loadClient();
+
+    await new GmailClient('u1').addLabel('t1', 'Important');
+    expect(mocks.labelsCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.threadsModify.mock.calls[0][0]).toMatchObject({
+      requestBody: { addLabelIds: ['L_new'] },
+    });
+  });
+
   it('recovers from a 409 race by re-listing labels', async () => {
     mocks.labelsList
       .mockResolvedValueOnce({ data: { labels: [] } })

@@ -85,7 +85,14 @@ export class GmailClient {
     const list = await this.callGmail('labels.list', () =>
       gmail.users.labels.list({ userId: 'me' }),
     );
-    const existing = list.data.labels?.find((l) => l.name === name);
+    const labels = list.data.labels ?? [];
+    // Exact match first — preserves user-created labels with case-distinct
+    // names. Fall back to a case-insensitive match against system labels only
+    // (e.g. bucket name "Important" → Gmail's reserved "IMPORTANT" system
+    // label, which labels.create would reject with 400).
+    const existing =
+      labels.find((l) => l.name === name) ??
+      labels.find((l) => l.type === 'system' && l.name?.toLowerCase() === name.toLowerCase());
     if (existing?.id) return existing.id;
 
     try {
