@@ -21,12 +21,7 @@ export function EmailCard({ thread, classification }: EmailCardProps) {
   const action = classification ? actionFor(classification) : null;
 
   const tooltipContent: ReactNode = (
-    <div className="space-y-1">
-      <div className="font-mono text-[10px] break-all">{email || thread.latestSender}</div>
-      {classification?.reasoning && (
-        <div className="text-xs leading-snug">{classification.reasoning}</div>
-      )}
-    </div>
+    <div className="font-mono text-[10px] break-all">{email || thread.latestSender}</div>
   );
 
   return (
@@ -58,7 +53,14 @@ export function EmailCard({ thread, classification }: EmailCardProps) {
         >
           {thread.subject || '(no subject)'}
         </div>
-        <div className="mt-0.5 line-clamp-2 text-xs text-neutral-500">{thread.latestSnippet}</div>
+        <div
+          className={cn(
+            'mt-0.5 text-xs text-neutral-500',
+            classification?.reasoning ? 'line-clamp-1' : 'line-clamp-2',
+          )}
+        >
+          {thread.latestSnippet}
+        </div>
         {classification && (
           <div className="mt-1 flex items-center gap-2">
             {action && <Badge variant={action.variant}>{action.label}</Badge>}
@@ -68,6 +70,11 @@ export function EmailCard({ thread, classification }: EmailCardProps) {
               showLabel={false}
               className="w-12"
             />
+          </div>
+        )}
+        {classification?.reasoning && (
+          <div className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500">
+            <span className="font-medium text-neutral-400">Why:</span> {classification.reasoning}
           </div>
         )}
       </a>
